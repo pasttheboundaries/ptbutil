@@ -1,0 +1,3 @@
+class BasicSecondaryException(Exception):
+    pass
+

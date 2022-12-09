@@ -1,0 +1,114 @@
+import pandas as pd
+import re
+from collections.abc import Iterable
+from .validate import validate_df, validate_in_values, validate_re, validate_filename
+
+
+def drop_valaues(df, value, axis=0):
+    """
+    Drops rows (if axis is set to 0) or columns (axis set to 1) containing indicated value
+    :param df: pd.DataFrame
+    :param value: Any
+    :param axis: int (0 or 1)
+    :return: transformed pd.DataFrame
+    """
+    dropable_i = set()
+    dropable_c = set()
+    for i in df.index:
+        for c in df.columns:
+            v = df.at[i, c]
+            if v == value or v is value:
+                (axis and dropable_c.add(c)) or dropable_i.add(i)
+    if dropable_i:
+        df = df.drop(list(dropable_i))
+    if dropable_c:
+        df = df.drop(list(dropable_c))
+    return df
+
+
+def find_incompatible(df, cal):
+    """
+    Identifies rows and columns where finds values not transformable by the callable
+    Works only if callable thows exception if fails
+    :param df: pd.DataFrame
+    :param cal: any callable - cell value will be passed to it
+    :return: identified values (v) together with indices (i) and columns (c)
+    """
+    identified = list()
+    for i in df.index:
+        for c in df.columns:
+            v = df.at[i, c]
+            try:
+                cal(v)
+            except:
+                identified.append({'i': i, 'c': c, 'v': v})
+
+    return identified
+
+def fill_incompatible(df, callable, value_to_fill):
+    """
+    Identifies cells where finds values not transformable by the cal
+    and replaces with value_to_fill
+    Works only if cal thows exception if fails
+    :param df:
+    :param callable:
+    :param value_to_fill:
+    :return:
+    """
+    incompatibles = find_incompatible(df, callable)
+    for inc in incompatibles:
+        df.at[inc['i'], inc['c']] = value_to_fill
+    return df
+
+
+def column_from_filename(df, filename, target_column, re_pattern) -> pd.DataFrame:
+    """
+    Creates a column in the df based on re.search(re_pattern, filename)
+    :param df: pd.DataFrame
+    :param filename: str
+    :param target_column: str name of category to be extracted : one of ('ward', 'microb', 'abx', 'year')
+    :param re_pattern: str
+    :return: df with ammended column names
+    """
+    df = validate_df(df)
+    filename = validate_filename(filename)
+    re_pattern = validate_re(re_pattern)
+
+    try:
+        column_value = re.search(re_pattern, filename).group()
+    except Exception as e:
+        raise ValueError(f'Could not extract from {filename} with {re_pattern}.') from e
+    else:
+        df[target_column] = column_value
+    return df
+
+
+def merge_cols(df: pd.DataFrame, columns, target_column, func):
+    """
+
+    :param df: pd.DataFrame to be transformed
+    :param columns: list of columns, re.Pattern or string to construct re.Pattern .
+        re.Pattern will be used to extract columns names to be merged
+    :param target_column: str - column name after merger
+    :param func: callable to ba applied over the rows of the relevant columns (axis=1)
+    :return:
+    """
+    col_re = None
+    if isinstance(columns, str):
+       col_re = re.compile(columns)
+    elif isinstance(columns, re.Pattern):
+        col_re = columns
+    elif isinstance(columns, Iterable) and all([isinstance(x, str) for x in columns]):
+        pass
+    else:
+        raise ValueError('Read __doc__. Could not accept value columns.'
+                         'Can only accept str, re.Pattern or a list of valid column names')
+    if col_re:
+        columns = [col for col in df.columns if col_re.search(col)]
+
+    newdf = pd.DataFrame()
+    for col in [c for c in df.columns if c not in columns]:  # transport of irrelevant cols to newdf
+        newdf[col] = df[col]
+    newdf[target_column] = [func(row) for row in df[columns].values]  # iteration over rows (0 axis of np.ndarray)
+
+    return newdf
