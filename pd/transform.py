@@ -1,7 +1,27 @@
 import pandas as pd
+import numpy as np
 import re
 from collections.abc import Iterable
 from .validate import validate_df, validate_in_values, validate_re, validate_filename
+from typing import Union, Any
+
+
+def apply_nan(data: Union[np.ndarray, pd.DataFrame], nan: Any):
+    """
+    Changes declared value into numpy.nan in pandas.DataFrame od numpy.ndarray
+
+    :param data: numpy.ndarray | pandas.DataFrame
+    :param nan: any value to be changed into numpy.nan in data
+    :return:
+    """
+    if not isinstance(data, (pd.DataFrame, np.ndarray)):
+        raise TypeError(f'function apply_nan can only transform pandas.DataFrame or numpy.ndarray')
+
+    if nan is None and isinstance(data, pd.DataFrame):
+        data[data.isna()] = np.nan
+    else:
+        data[data == nan] = np.nan
+    return data
 
 
 def drop_valaues(df, value, axis=0):
@@ -47,9 +67,9 @@ def find_incompatible(df, cal):
 
 def fill_incompatible(df, callable, value_to_fill):
     """
-    Identifies cells where finds values not transformable by the cal
+    Identifies cells where finds values not transformable by the callable
     and replaces with value_to_fill
-    Works only if cal thows exception if fails
+    Works only if callable thows exception when fails
     :param df:
     :param callable:
     :param value_to_fill:
@@ -112,3 +132,4 @@ def merge_cols(df: pd.DataFrame, columns, target_column, func):
     newdf[target_column] = [func(row) for row in df[columns].values]  # iteration over rows (0 axis of np.ndarray)
 
     return newdf
+

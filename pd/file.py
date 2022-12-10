@@ -41,7 +41,7 @@ def _read_df_by_ex(extension, filepath, encoding='utf-8', sep=','):
         raise ValueError(f'Could not read file with extension {extension}')
 
 
-def read_files(directory=None, nameroot=None, extention=None, encoding='utf-8', sep=','):
+def read_dir_files(directory=None, nameroot=None, extention=None, encoding='utf-8', sep=','):
     """
     Supports opening files with extensions
     :param directory: str, if None files will be read from current working directory

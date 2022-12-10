@@ -1,0 +1,23 @@
+this is a private utility repository
+
+it is not aimed at any other purpose than supporting my own work
+however one may find some solutions there that might be useful
+
+namespaces and packages contain scripts, functions, classes and snippets
+
+
+probabbly one of the most usefull classes is StringTree in module tree
+I used it multiple times for nlp in Polish language.
+Polish language recquires lematization = finding a lemat of a word
+To keep all lemats of all known words in memory would take losts of resources.
+Also, querrying over such a set would be very time consumeing.
+StringTree solves this problem satisfactory.
+
+Quit a spectacular class in RomanNumeral also.
+Never tested it for speed but, I believe, it excercises flawless encoding - decoding algorythm.
+It is also quite flexible.
+Made it a long time ago, and I am not sure about errors handling.
+I used it also for text data extraction
+
+
+

@@ -2,119 +2,119 @@ import pickle
 import json
 from ptbutil.iteration import merge_2_dicts
 
-class Tree:
-    """
-    This is idea only. It is not suitable for use.
-    The purpose of this class is to keep idea of a tree structure
-    BUT
-    where there is a branch there can not be leaf
-    SO it only keeps leaves at the end of the branch
-    If a leaf is exendend into a branch its value disappears
-    """
-    def __init__(self, args):
-        self._tree = dict()
-        self._distribute_args(self._tree, args)
-
-    def _distribute_args(self, _tree, args, write=True):
-        if len(args) > 1:
-            key, *val = args
-            if key in _tree:
-                if isinstance(_tree[key], dict):
-                    return self._distribute_args(_tree[key], val, write=write)
-                elif _tree[key] is True:
-                    _tree[key] = dict()
-                    return self._distribute_args(_tree[key], val, write=write)
-                else:
-                    raise RuntimeError('error in Tree')
-
-
-            else:
-                if write:
-                    _tree[key] = dict()
-                    return self._distribute_args(_tree[key], val, write=write)
-                else:
-                    return False
-        elif len(args) == 1:
-            key = args[0]
-            if key in _tree:
-                if write:
-                    if isinstance(_tree[key], dict):
-                        return _tree[key]
-                    if _tree[key] is True:
-                        return True
-                else:
-                    if isinstance(_tree[key], dict):
-                        return False
-                    if _tree[key] is True:
-                        return True
-            else:
-                if write:
-                    if isinstance(_tree[key], dict):
-                        _tree[key][0] # ????
-                    if _tree[key] is True:
-                        return True
-                else:
-                    if isinstance(_tree[key], dict):
-                        return False
-                    if _tree[key] is True:
-                        return True
-        else:  # 0
-            return self._tree
-
-    def next(self, args):
-        next_ = self._distribute_args(self._tree, args, write=False)
-        if next_ is False:
-            return False
-        elif isinstance(next_, dict):
-            return tuple(next_.keys())
-        else:
-            return
-
-    @staticmethod
-    def _search_leaves(tree):
-        current_level_leaves = []
-        for key, value in tree.items():
-            if value is True:
-                current_level_leaves.append(key)
-            if isinstance(value, dict):
-                current_level_leaves.extend(Tree._search_leaves(value))
-        return current_level_leaves
-
-    @staticmethod
-    def _yield_branches(tree):
-        keys = tree.keys()
-        for key in keys:
-            if isinstance(tree[key], dict):
-                further_branches = Tree._yield_branches(tree[key])
-                for f_branch in further_branches:
-                    current_branch = [key]
-                    current_branch.extend(f_branch)
-                    yield current_branch
-            elif tree[key] is True:
-                yield [key]
-            else:
-                raise RuntimeError('Iduno')
-
-    def leaves(self, args):
-        branch = self._distribute_args(self._tree, args)
-        return self._search_leaves(branch)
-
-    def branches(self):
-        brans = Tree._yield_branches(self._tree)
-        for branch in brans:
-            yield branch
-
-    def root(self):
-        return self.next('')
-
-    def to_dict(self):
-        return self._tree
-
-    def __call__(self, args, write=True):
-        return self._distribute_args(self._tree, args, write=write)
-
-    def __repr__(self):
-        return self._tree.__repr__()
+# class Tree:
+#     """
+#     This is idea only. It is not suitable for use.
+#     The purpose of this class is to keep idea of a tree structure
+#     BUT
+#     where there is a branch there can not be leaf
+#     SO it only keeps leaves at the end of the branch
+#     If a leaf is exendend into a branch its value disappears
+#     """
+#     def __init__(self, args):
+#         self._tree = dict()
+#         self._distribute_args(self._tree, args)
+#
+#     def _distribute_args(self, _tree, args, write=True):
+#         if len(args) > 1:
+#             key, *val = args
+#             if key in _tree:
+#                 if isinstance(_tree[key], dict):
+#                     return self._distribute_args(_tree[key], val, write=write)
+#                 elif _tree[key] is True:
+#                     _tree[key] = dict()
+#                     return self._distribute_args(_tree[key], val, write=write)
+#                 else:
+#                     raise RuntimeError('error in Tree')
+#
+#
+#             else:
+#                 if write:
+#                     _tree[key] = dict()
+#                     return self._distribute_args(_tree[key], val, write=write)
+#                 else:
+#                     return False
+#         elif len(args) == 1:
+#             key = args[0]
+#             if key in _tree:
+#                 if write:
+#                     if isinstance(_tree[key], dict):
+#                         return _tree[key]
+#                     if _tree[key] is True:
+#                         return True
+#                 else:
+#                     if isinstance(_tree[key], dict):
+#                         return False
+#                     if _tree[key] is True:
+#                         return True
+#             else:
+#                 if write:
+#                     if isinstance(_tree[key], dict):
+#                         _tree[key][0] # ????
+#                     if _tree[key] is True:
+#                         return True
+#                 else:
+#                     if isinstance(_tree[key], dict):
+#                         return False
+#                     if _tree[key] is True:
+#                         return True
+#         else:  # 0
+#             return self._tree
+#
+#     def next(self, args):
+#         next_ = self._distribute_args(self._tree, args, write=False)
+#         if next_ is False:
+#             return False
+#         elif isinstance(next_, dict):
+#             return tuple(next_.keys())
+#         else:
+#             return
+#
+#     @staticmethod
+#     def _search_leaves(tree):
+#         current_level_leaves = []
+#         for key, value in tree.items():
+#             if value is True:
+#                 current_level_leaves.append(key)
+#             if isinstance(value, dict):
+#                 current_level_leaves.extend(Tree._search_leaves(value))
+#         return current_level_leaves
+#
+#     @staticmethod
+#     def _yield_branches(tree):
+#         keys = tree.keys()
+#         for key in keys:
+#             if isinstance(tree[key], dict):
+#                 further_branches = Tree._yield_branches(tree[key])
+#                 for f_branch in further_branches:
+#                     current_branch = [key]
+#                     current_branch.extend(f_branch)
+#                     yield current_branch
+#             elif tree[key] is True:
+#                 yield [key]
+#             else:
+#                 raise RuntimeError('Iduno')
+#
+#     def leaves(self, args):
+#         branch = self._distribute_args(self._tree, args)
+#         return self._search_leaves(branch)
+#
+#     def branches(self):
+#         brans = Tree._yield_branches(self._tree)
+#         for branch in brans:
+#             yield branch
+#
+#     def root(self):
+#         return self.next('')
+#
+#     def to_dict(self):
+#         return self._tree
+#
+#     def __call__(self, args, write=True):
+#         return self._distribute_args(self._tree, args, write=write)
+#
+#     def __repr__(self):
+#         return self._tree.__repr__()
 
 
 class StringTree:
@@ -140,7 +140,7 @@ class StringTree:
                   "a single character as it might impinge the tree!")
 
     def count_leaves(self):
-        self.n_leaves = self._count_leaves(self.tree, self.target_key)
+        self.n_leaves = StringTree._count_leaves(self.tree, self.target_key)
         self.counted = True
         return self.n_leaves
 
@@ -151,7 +151,7 @@ class StringTree:
             count += 1
         for key in (k for k in dic.keys() if k != leaf_key):
             other_dic = dic[key]
-            count = count + Tree._count_leaves(other_dic, leaf_key)
+            count = count + StringTree._count_leaves(other_dic, leaf_key)
         return count
 
     def record(self, key: any, value):

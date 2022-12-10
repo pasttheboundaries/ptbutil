@@ -1,3 +1,0 @@
-class BasicSecondaryException(Exception):
-    pass
-
