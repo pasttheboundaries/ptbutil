@@ -63,6 +63,18 @@ class GridFeed:
         return len(tuple(iter(self)))
 
 
+def ifish(it: Iterable, *indexes: int):
+    """fishes out element of iterable by indexes
+    USE:
+    ifish(range(10,20), 3, 5, 6)
+    13, 15, 16
+    """
+    if not isinstance(it, Iterable):
+        raise (f'function ifish can olny fish elements of an iterable. Got type {type(it)}')
+    if any(not isinstance(i, int) for i in indexes):
+        raise TypeError(f'Indexes must be type int.')
+    return [e for n, e in enumerate(it) if n in indexes]
+
 def indmap(fn, sequence, indices=None):
     """maps function to a sequence elements indicated in indices.
     :param fn: cal that accepts one argument and returns resulting object,
