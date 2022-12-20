@@ -1,7 +1,97 @@
 from matplotlib import pyplot as plt
 from matplotlib.axes import SubplotBase
 import numpy as np
-from typing import Union, Iterable
+import pandas as pd
+from typing import Union, Iterable, Any
+from ptbutil.validation import validate_2d_array
+
+
+__all__ = ['missing_data_plate','mdp' , 'plate2d']
+
+
+class AbsentData:
+    pass
+
+def apply_nan(data: Union[np.ndarray, pd.DataFrame], nan: Any):
+    data[data == nan] = np.nan
+    return data
+
+
+def _fix_types_in_DF(df):
+    for column in df.columns:
+        if df[column].dtype in (object, str):
+            df[column] = df[column].apply(bool).apply(int)
+    return df
+
+
+def _fix_array_dtype(array):
+    if array.dtype == object:
+        array = (array == True).astype(int)
+    return array
+
+def missing_data_plate(data: Union[np.ndarray, pd.DataFrame], title=None, dpi=200, figsize=(4, 4), columns=None,
+                       interpolation='antialiased', nans=AbsentData):
+    """
+    Visualises missing data in 2D data table like pandas.DataFrame or numpy.ndarray
+    :param data: input data (numpy.ndarray or pandas.DataFrame);
+    :param title: str ;
+    :param dpi: int;
+    :param figsize: tuple of 2 integers - size in inches ;
+    :param columns: iterable of column names. If left None , ordinal numbers will be applied as in numpy.ndarray;
+    :return: matplotlib.pyplot.Figure
+    """
+
+
+    # sorting types
+    if isinstance(data, pd.DataFrame):
+        data = _fix_types_in_DF(data)
+    elif isinstance(data, np.ndarray):
+        data = _fix_array_dtype(data)
+    else:
+        raise TypeError('Can only construct missing data plate for numpy.ndarray or pandas.DataFrame.')
+
+    if isinstance(data, pd.DataFrame):
+        columns = columns or data.columns
+    else:
+        columns = columns or list(range(data.shape[1]))
+
+        data = validate_2d_array(data)
+        data = pd.DataFrame(data)
+
+    # changes declared nan values into np.nan, so it subsequently can be cut out by isna()
+    if nans is not AbsentData:
+        if isinstance(nans, (tuple, list, set)):
+            for nan in nans:
+                data = apply_nan(data, nan)
+        else:
+            data = apply_nan(data, nans)
+
+    data = ~data.isna()
+    data = data.values.astype(int)
+
+    percentages = np.round((1 - (np.sum(data, axis=0) / data.shape[0])), 3)
+
+    # this guarantees all ones will come out as black picture and avoids normalization
+    # this must be done after percentages calculation
+    if np.all(data == 1):
+        data[0, 0] = 0.99991
+
+    fig, axes = plt.subplots(dpi=dpi)
+    fig.set_size_inches(figsize)
+    axes.imshow(data, aspect='auto', cmap='binary', interpolation=interpolation)
+    xtic_loc = range(0, data.shape[1])
+    axes.set_xticks(xtic_loc, percentages, rotation=90, font={'size': 4})
+    axes.set_xlim(-.5, data.shape[1] - 0.5)
+    plt.xlabel('missing data fraction')
+    axes2 = axes.twiny()
+    axes2.set_xticks(xtic_loc, columns, rotation=90, font={'size': 4})
+    axes2.set_xlim(-.5, data.shape[1] - 0.5)
+    title and fig.suptitle(title)
+    fig.tight_layout()
+    return fig
+
+
+mdp = missing_data_plate  # alias
 
 
 def plate2d(*arrays: np.ndarray,
@@ -33,6 +123,8 @@ def plate2d(*arrays: np.ndarray,
 
     if not all(array.ndim == 2 for array in arrays):
         raise ValueError('Can onlu draw plates for 2D numpy arrays.')
+
+
 
     if shape is None:
         shape = len(arrays)

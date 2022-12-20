@@ -1,6 +1,10 @@
-from typing import Any, Type
+from typing import Any, Type, Iterable
 from ptbutil.errors.basic import ValidationError
+import pandas as pd
+import numpy as np
 
+
+__all__ = ['validate_2d_array', 'validate_type']
 
 def validate_type(obj: Any,
                   *types: Type,
@@ -28,3 +32,20 @@ def validate_type(obj: Any,
 
     if all(not isinstance(obj, t) for t in types):
         raise ValidationError from TypeError(error_message)
+
+
+def validate_2d_array(it: Iterable):
+    if isinstance(it, np.ndarray):
+        if it.ndim == 2:
+            return it
+        else:
+            raise ValueError from ValidationError(f'Expected 2d array. Got {it.ndim}d array.')
+    elif isinstance(it, pd.DataFrame):
+        print('PANDAS')
+        return it.values
+    else:
+        try:
+            return np.array(it)
+        except Exception as e:
+            raise ValidationError('Attempted to create numpy.array form delivered data but could not. Review input data') \
+                from e

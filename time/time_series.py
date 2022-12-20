@@ -5,11 +5,11 @@ from typing import Iterable, Union, NoReturn, Iterator, Optional
 from ptbutil.errors import ParsingError
 
 
-class ClosestTimePoint:
+class ClosestTimePoints:
     """
     This class provides an iterator of datetime objects closest to time_zero date
 
-    At instantiation it accepts:
+    At instantiation, it accepts:
     - time_zero : datetime.datetime or pandas.Timestamp
     - times_array: Iterable[datetime.datetime | pandas.Timestamp],
         any type if iterable object with nested datetime objects
@@ -203,8 +203,10 @@ class DatedFeature:
         raise ParsingError(f'Found attributes {valid_attrs} but could not parse any.')
 
     def seek_datetime(self):
+        if isinstance(self.feature, str):
+            return self._parse_string(self.feature)
         # dict case
-        if isinstance(self.feature, dict):
+        elif isinstance(self.feature, dict):
             return self._seek_in_dict()
         else:
             return self._seek_object_attributes()
