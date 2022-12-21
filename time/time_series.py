@@ -5,6 +5,9 @@ from typing import Iterable, Union, NoReturn, Iterator, Optional
 from ptbutil.errors import ParsingError
 
 
+class DatetimeParsingError(Exception):
+    pass
+
 class ClosestTimePoints:
     """
     This class provides an iterator of datetime objects closest to time_zero date
@@ -113,37 +116,54 @@ class DatedFeature:
     """
     This class is a wrapper for objects that potentially contain information about date (and time)
     It seeks most likely atributes for values that could be parsed to datetime.datetime
+    or follows a hint parameter to search for matching propperty or attribute.
+
+    If 2 attributes or keyed values hold date or time details - the first found is treated as the one.
+
+    If extended_search is True - all other parameters or attributes will be searched,
+
+    If datetime parseable value is not found it rises DatetimeParsingError
 
     it holds 2 properties:
     - feature (the examined object itself)
     - datetime - extracted and parsed datetime.datetime
 
-    If 2 attributes or keyed values hold date or time details - the first found is treated as the one.
+
+
 
 
     """
 
-    _checkable_attrs = 'date datetime time timestamp t day'.split()
+    _checkable_attrs = 'date datetime time timestamp day'.split()
 
     def __init__(self,
                  feature,
+                 hint: Optional[str] = None,
                  frmt: Optional[str] = None,
                  dayfirst: bool = True,
-                 yearfirst: bool = False):
+                 yearfirst: bool = False,
+                 extended_search: bool = False):
         """
 
         :param feature:
+        :param hint: str - name of attribute or property to be parsed or part of it (case sensitive)
         :param frmt: str -  along with satetime time formatting rules
         :param dayfirst: bool - parsing parameter for pandas.to_datetime,
             default True respects is Polish date formatting
         :param yearfirst: bool - parsing parameter for pandas.to_datetime,
             default False respects Polish date formatting
+        :param extended_search: bool
+            - if datetime parseable object is not found in attributes or propperties indicated by hint or
+            in default attribute names (DatedFeature._checkable_attrs),
+            all other attributes and properties will be searched.
         """
 
         self.feature = feature
+        self.hint = hint
         self.frmt = frmt
         self.dayfirst = dayfirst
         self.yearfirst = yearfirst
+        self.extended_search = extended_search
         self.datetime = self.seek_datetime()
 
     @staticmethod
@@ -151,9 +171,14 @@ class DatedFeature:
         try:
             return datetime.datetime.fromisoformat(dt)
         except ValueError:
-            raise ParsingError(f'Could not parse date {dt}')
+            raise DatetimeParsingError(f'Could not parse date {dt}')
 
     def _parse_string(self, dt):
+        """
+        attempts to use pd.to_datetime and re-passes to _parse_value to return datetime.datetime
+
+        if this fails tries _from_isoformat
+        """
         try:
             return self._parse_value(
                 pd.to_datetime(
@@ -176,37 +201,78 @@ class DatedFeature:
         elif isinstance(dt, str):
             return self._parse_string(dt)
         else:
-            raise ParsingError(f'Could not parse date {dt}')
+            raise DatetimeParsingError(f'Could not parse date {dt}')
+
+    def _re_attr_check(self, attr, pattern):
+        return bool(re.search(pattern, attr))
+
+    def _attr_in_checkable(self, attr):
+        if self.hint:
+            checkable_attrs = [self.hint]
+        else:
+            checkable_attrs = self._checkable_attrs
+        for checkable in checkable_attrs:
+            if bool(re.search(checkable, attr)):
+                return True
+        return False
+
+
+    def _find_parseable_value(self, values: Iterable) -> Union[datetime.datetime, None]:
+        for value in values:
+            try:
+                return self._parse_value(value)
+            except DatetimeParsingError:
+                pass
+        return None
 
     def _seek_in_dict(self):
-        valid_attrs = tuple(key for key in self.feature.keys() if key in self._checkable_attrs)
+        # checking items indicated by hint or _checkable_attrs:
+        valid_keys = tuple(key for key in self.feature.keys() if self._attr_in_checkable(key))
+        checkable_values = [self.feature[key] for key in valid_keys]
+        if result := self._find_parseable_value(checkable_values):
+            return result
 
-        if not any(valid_attrs):
-            raise KeyError(f'Could not find suitabale keys in a dict')
+        if self.extended_search:
+            # checking other values if parseable
+            other_values = [value for key, value in self.feature.items() if key not in valid_keys]
+            if result := self._find_parseable_value(other_values):
+                return result
 
-        for key in valid_attrs:
-            try:
-                return self._parse_value(self.feature[key])
-            except ParsingError as e:
-                raise ParsingError(f'Found key {key} but could not parse it') from e
+        raise DatetimeParsingError(f'Could not find valid key or parseable value in dict.')
 
     def _seek_object_attributes(self):
-        valid_attrs = tuple(attr for attr in self._checkable_attrs if hasattr(self.feature, attr))
-        if not any(valid_attrs):
-            raise AttributeError(f'Could not find suitabale attribute')
 
-        for attr in valid_attrs:
-            try:
-                return self._parse_value(self.feature.__getattribute__(attr))
-            except ParsingError:
-                pass
-        raise ParsingError(f'Found attributes {valid_attrs} but could not parse any.')
+        # checking attributes indicated by hint or _checkable_attrs:
+        valid_attrs = tuple(attr for attr in self.feature.__dict__.keys() if self._attr_in_checkable(attr))
+        checkable_values = [self.feature.__getattribute__(attr) for attr in valid_attrs]
+        if result := self._find_parseable_value(checkable_values):
+            return result
+
+        if self.extended_search:
+            # checking other values if parseable
+            other_attrs = [attr for attr in self.feature.__dict__.keys() if attr not in valid_attrs]
+            checkable_values = [self.feature.__getattribute__(attr) for attr in other_attrs]
+            if result := self._find_parseable_value(checkable_values):
+                return result
+
+        raise DatetimeParsingError(f'Could not find valid attribute name or parseable attribute value in the object.')
+
+
+    def _seek_string(self, text):
+        suspected_values = re.findall(r'\b[\d-./:]+\b', text)
+        if result := self._find_parseable_value(suspected_values):
+            return result
+        else:
+            raise DatetimeParsingError(f'Could not find date representation in the passed string.')
 
     def seek_datetime(self):
         if isinstance(self.feature, str):
-            return self._parse_string(self.feature)
+            return self._seek_string(self.feature)
         # dict case
         elif isinstance(self.feature, dict):
             return self._seek_in_dict()
         else:
             return self._seek_object_attributes()
+
+    def __repr__(self):
+        return f'<DatedFeature> {type(self.feature)}, datetime: {self.datetime}'

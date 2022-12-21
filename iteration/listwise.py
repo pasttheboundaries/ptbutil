@@ -63,7 +63,7 @@ class GridFeed:
         return len(tuple(iter(self)))
 
 
-def ifish(it: Iterable, *indexes: int):
+def ifish(it: Iterable, indexes: Iterable):
     """fishes out element of iterable by indexes
     USE:
     ifish(range(10,20), 3, 5, 6)
