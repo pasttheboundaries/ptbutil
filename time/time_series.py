@@ -1,5 +1,6 @@
 import datetime
 import pandas as pd
+import re
 
 from typing import Iterable, Union, NoReturn, Iterator, Optional
 from ptbutil.errors import ParsingError
@@ -110,6 +111,10 @@ class ClosestTimePoints:
     def __getitem__(self, item):
         self.iter_dispenser = self.iter_dispenser or self.arange()
         return self.iter_dispenser[item]
+
+    def __repr__(self):
+        return f'<ClosestTimePoints {self.time_zero}>'
+
 
 
 class DatedFeature:
@@ -257,7 +262,6 @@ class DatedFeature:
 
         raise DatetimeParsingError(f'Could not find valid attribute name or parseable attribute value in the object.')
 
-
     def _seek_string(self, text):
         suspected_values = re.findall(r'\b[\d-./:]+\b', text)
         if result := self._find_parseable_value(suspected_values):
@@ -273,6 +277,20 @@ class DatedFeature:
             return self._seek_in_dict()
         else:
             return self._seek_object_attributes()
+
+    def __eq__(self, other):
+        if not isinstance(other, (DatedFeature, datetime.datetime, datetime.date)):
+            raise TypeError(f'Could not compare DatedFeature to {type(other)}')
+        if isinstance(other, DatedFeature):
+            other = other.datetime
+        return self.datetime == other
+
+    def __lt__(self, other):
+        if not isinstance(other, (DatedFeature, datetime.datetime, datetime.date)):
+            raise TypeError(f'Could not compare DatedFeature to {type(other)}')
+        if isinstance(other, DatedFeature):
+            other = other.datetime
+        return self.datetime < other
 
     def __repr__(self):
         return f'<DatedFeature> {type(self.feature)}, datetime: {self.datetime}'
