@@ -1,4 +1,5 @@
 import os
+import yaml
 
 
 def files_in_dir(directory_path, condition=None) -> list:
@@ -7,3 +8,8 @@ def files_in_dir(directory_path, condition=None) -> list:
     condition = condition or (lambda x: True)
     filenames = os.listdir(directory_path)
     return [os.path.join(directory_path, filename) for filename in filenames if condition(filename)]
+
+
+def read_yaml(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        return yaml.load(f.read(), Loader=yaml.Loader)

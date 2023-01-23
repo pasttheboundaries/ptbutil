@@ -16,9 +16,11 @@ def log_timing(fn):
         return result
     return wrapper
 
+
 def now(format=None):
     format = format or "%Y/%m/%d_%X"
     return time.strftime(format)
+
 
 class perf_pool:
     """

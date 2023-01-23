@@ -3,4 +3,4 @@ from .functions import files_in_dir
 from .decorators import RTW, RTWProtocolError
 
 
-dirfiles = files_in_dir  #alias
+dir_files = files_in_dir  #alias

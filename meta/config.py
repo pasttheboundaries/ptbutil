@@ -1,0 +1,4 @@
+
+LOG_PARAMS = True
+LEVEL = 10 #logging.DEBUG
+MESSAGE_COLOR = "\x1b[38;20m"

@@ -1,9 +1,12 @@
 
-from ptbutil.iteration import dicta
+import yaml
 
-class Config(dicta):
-    def from_file(self, conf):
-        """Zmienne zaciągnięte z pliku conf muszą być uppercase żeby zostać dodanym do Config"""
-        for k, v in conf.__dict__.items():
-            if k.isupper():
-                self.update({k: v})
+class Config:
+    def __init__(self, config_dict):
+        for k, v in config_dict.items():
+            self.__setattr__(k, v)
+
+    @classmethod
+    def from_yaml(cls, path):
+        with open(path, 'r') as f:
+            return Config(yaml.load(f.read(), Loader=yaml.CLoader))

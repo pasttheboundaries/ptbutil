@@ -1,2 +1,2 @@
-from . timing import *
-from . time_series import ClosestTimePoint, DatedFeature
+from .timing import *
+from .datedfeature import ClosestTimePoints, DatedFeature
