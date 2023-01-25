@@ -1,7 +1,7 @@
 import datetime
 import pandas as pd
 from typing import Iterable, Union, NoReturn, Iterator, Optional, Any
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import re
 
 
@@ -146,37 +146,43 @@ class DatedFeature:
                  frmt: Optional[str] = None,
                  dayfirst: bool = True,
                  yearfirst: bool = False,
-                 extended_search: bool = False,
+                 values_search: bool = True,
                  ignore_exceptions: bool = False):
         """
 
         :param feature:
         :param hint: Any
+            DatedFeature primarily searches keys and attributes of the feature for likely names like 'date' or 'time'.
+            Hint is to direct search towards appropriate attribute (key in a dict).
             - if a string is passed, it must be name of attribute or property to be parsed to datetime,
             or part of the name (case-insensitive) - will be regex matched
             (for example if object has attribute obj.first_date, hint='date' will match.
             - if any other type: equality will be checked agains the feature keys if the feature is type Mapping.
             (for example: if date is in the feature( type Mapping) under the key=11, hint=11 will match.)
-        :param frmt: str -  along with satetime time formatting rules
+        :param frmt: str - along with datetime time formatting rules, expected date format in a string.
+            if None, pandas comprehensive string date parser (used here as the last resort of parsing string)
+            will use its own formats.
         :param dayfirst: bool - parsing parameter for pandas.to_datetime,
             default True respects is Polish date formatting
         :param yearfirst: bool - parsing parameter for pandas.to_datetime,
             default False respects Polish date formatting
-        :param extended_search: bool
-            - if datetime parseable object is not found in attributes or propperties indicated by hint or
+        :param values_search: bool
+            If datetime parseable object is not found in attributes or propperties indicated by hint or
             in default attribute names (DatedFeature._checkable_attrs),
             all other attributes and properties will be searched.
-        :param ignore_exceptions: bool. If True , in case of failed parsing will return None.
+            This is default behaviour and might be blocked by setting values_search to False.
+        :param ignore_exceptions: bool. If True, in case of failed parsing will return None.
             If False will raise DatetimeParsingError
         """
         self.hint = hint
         self.frmt = frmt
         self.dayfirst = dayfirst
         self.yearfirst = yearfirst
-        self.extended_search = extended_search
+        self.values_search = values_search
         self.ignore = ignore_exceptions
         self.feature = None
-        self.datetime = None
+        self._datetime = None
+        self.date = None
         self._solve(feature)
 
     @staticmethod
@@ -209,6 +215,8 @@ class DatedFeature:
             return dt.to_pydatetime()
         elif isinstance(dt, datetime.datetime):
             return dt
+        elif isinstance(dt, DatedFeature):
+            return dt.datetime
         elif isinstance(dt, tuple) and all(type(v) == int for v in dt):
             return datetime.datetime(*dt)
         elif isinstance(dt, str):
@@ -251,7 +259,7 @@ class DatedFeature:
         if result := self._find_parseable_value(checkable_values):
             return result
 
-        if self.extended_search:
+        if self.values_search:
             # checking other values if parseable
             other_values = [value for key, value in self.feature.items() if key not in valid_keys]
             if result := self._find_parseable_value(other_values):
@@ -267,7 +275,7 @@ class DatedFeature:
         if result := self._find_parseable_value(checkable_values):
             return result
 
-        if self.extended_search:
+        if self.values_search:
             # checking other values if parseable
             other_attrs = [attr for attr in self.feature.__dict__.keys() if attr not in valid_attrs]
             checkable_values = [self.feature.__getattribute__(attr) for attr in other_attrs]
@@ -283,12 +291,20 @@ class DatedFeature:
         else:
             raise DatetimeParsingError(f'Could not find date representation in the passed string.')
 
+    def seek_in_sequence(self):
+        if all(isinstance(i, int) for i in self.feature):
+            return self._parse_value(tuple(self.feature))
+        else:
+            return self._find_parseable_value(tuple(self.feature))
+
     def seek_datetime(self):
         if isinstance(self.feature, str):
             return self._seek_string(self.feature)
         # dict case
         elif isinstance(self.feature, Mapping):
             return self._seek_in_dict()
+        elif isinstance(self.feature, Sequence):
+            return self.seek_in_sequence()
         else:
             return self._seek_object_attributes()
 
@@ -306,6 +322,15 @@ class DatedFeature:
                 else:
                     raise DatetimeParsingError(f'Could not cast to DatedFeature. ({repr(obj)})') from e
 
+    @property
+    def datetime(self):
+        return self._datetime
+
+    @datetime.setter
+    def datetime(self, dt):
+        self._datetime = dt
+        self.date = dt.date()
+
     def __eq__(self, other):
         if not isinstance(other, DatedFeature):
             other = DatedFeature(other)
@@ -317,15 +342,15 @@ class DatedFeature:
         return self.datetime < other.datetime
 
     def __repr__(self):
-        return f'<DatedFeature> {type(self.feature)}, datetime: {self.datetime}'
+        return f'<DatedFeature feature: {type(self.feature)}, datetime: {self.datetime}>'
 
 
 def closest(reference, others, look=0):
     reference = DatedFeature(reference).datetime
     others_dates = [DatedFeature(other).datetime for other in others]
-    clsst = ClosestTimePoints(reference, others_dates, look=look).first
+    closest = ClosestTimePoints(reference, others_dates, look=look).first
     for date, other in zip(others_dates, others):
-        if date == clsst:
+        if date == closest:
             return other
 
 
