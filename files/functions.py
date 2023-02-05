@@ -1,5 +1,6 @@
 import os
 import yaml
+import json
 
 
 def files_in_dir(directory_path, condition=None) -> list:
@@ -13,3 +14,8 @@ def files_in_dir(directory_path, condition=None) -> list:
 def read_yaml(path):
     with open(path, 'r', encoding='utf-8') as f:
         return yaml.load(f.read(), Loader=yaml.Loader)
+
+
+def read_json(path, encoding='utf-8'):
+    with open(path, 'r', encoding=encoding) as f:
+        return json.loads(f.read())

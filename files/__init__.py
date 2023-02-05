@@ -1,5 +1,5 @@
 from .classes import MultipleRead
-from .functions import files_in_dir
+from .functions import files_in_dir, read_json, read_yaml
 from .decorators import RTW, RTWProtocolError
 
 
