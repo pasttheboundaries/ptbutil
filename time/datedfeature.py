@@ -354,9 +354,25 @@ def closest(reference, others, look=0):
             return other
 
 
-def ordered(*items):
+def ordered(*items: Iterable):
     if len(items) < 2:
-        raise ValueError(f'Could not determine time order for less')
+        raise ValueError(f'Could not determine time order for lees than 2 elements.')
     dfs = sorted([DatedFeature(item) for item in items], key=lambda x: x.datetime, reverse=False)
     return tuple(df for df in dfs)
+
+
+class TimeOrdered:
+    def __init__(self, items: Iterable):
+        self.items = ordered(*items)
+
+    @property
+    def features(self):
+        return [it.feature for it in self.items]
+
+    @property
+    def datetimes(self):
+        return [it.datetime for it in self.items]
+
+    def __iter__(self):
+        return (it for it in self.features)
 
