@@ -199,7 +199,7 @@ class Stopper:
         self.oneline = oneline
 
     def _capture(self):
-        current = time.timing()
+        current = time.perf_counter()
         total = self._total(current)
         lap = self._lap_time(total)
         return current, total, lap

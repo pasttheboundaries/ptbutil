@@ -1,8 +1,10 @@
-from collections.abc import Iterable, Callable, Sequence, Generator
+from collections.abc import Iterable, Callable, Sequence, Generator, Mapping
 from typing import Optional, NoReturn, Any
 from itertools import chain, product
 from collections import deque, UserList
 import numpy as np
+import random
+from math import ceil, floor
 
 
 def chaintype(t: type, *iterators: Iterable):
@@ -26,7 +28,7 @@ def flatlist(l) -> list:
     """flattens nested lists"""
     items = []
     for item in l:
-        if isinstance(item, (tuple, list, set)):
+        if isinstance(item, (tuple, list, set, Generator, map)):
             items += flatlist(item)
         else:
             items.append(item)
@@ -70,10 +72,11 @@ def ifish(it: Iterable, indexes: Iterable):
     13, 15, 16
     """
     if not isinstance(it, Iterable):
-        raise (f'function ifish can olny fish elements of an iterable. Got type {type(it)}')
+        raise TypeError(f'function ifish can olny fish elements of an iterable. Got type {type(it)}')
     if any(not isinstance(i, int) for i in indexes):
         raise TypeError(f'Indexes must be type int.')
     return [e for n, e in enumerate(it) if n in indexes]
+
 
 def indmap(fn, sequence, indices=None):
     """maps function to a sequence elements indicated in indices.
@@ -95,10 +98,31 @@ def indmap(fn, sequence, indices=None):
         ind = 0
         while ind < l:
             if ind in indices:
-                yield(fn(sequence[ind]))
+                yield fn(sequence[ind])
             else:
                 yield sequence[ind]
             ind += 1
+
+
+def lsplit(seq: Sequence, length: int):
+    """
+    Splits sequence into lists of elements of declared length
+    :param seq:
+    :param length:
+    :return:
+    """
+    if not isinstance(seq, Sequence):
+        raise TypeError('lsplit can only partition Sequence type')
+    start = 0
+    splits = []
+    while True:
+        end = start + length
+        split = tuple(seq[start: end])
+        if len(split) == 0:
+            break
+        splits.append(split)
+        start = end
+    return splits
 
 
 class MaskableList(list):
@@ -119,6 +143,35 @@ class MaskableList(list):
         if reduce:
             return(pair[0] for pair in zip(self, m) if pair[1])
         return (prod(*pair) for pair in zip(self, m))
+
+
+def mix_sequence(seq, n: Optional[int] = None, k: Optional[float] = 1):
+    """
+    mixes elements order in a sequence
+    n: int determines the maximum number of elements to be moved in the sequence
+    k: determines the distance the moved element is displaced as a percentage of the original sequence length
+    """
+    seq_len = len(seq)
+
+    # set default values for n and k
+    n = n or 1
+    k = k if 0 < k <= 1 else 1
+
+    # calculate maximum steps based on k
+    max_steps = min(round(seq_len * k), seq_len)
+
+    # initialize variables
+    min_steps = 1
+    cseq = list(seq)
+
+    # shuffle elements
+    for _ in range(n):
+        ind = random.randint(0, seq_len - 1)
+        steps = random.randint(min_steps, max_steps) * random.choice([-1, 1])
+        new_ind = min(max(0, ind + steps), seq_len)
+        cseq.insert(new_ind, cseq.pop(ind))
+
+    return tuple(cseq)
 
 
 class UnevenNestingError(Exception):
@@ -299,6 +352,33 @@ def nlen(*iterables):
     """
     return tuple((len(i) for i in iterables))
 
+
+def nsplit(seq: Sequence, n: int, keep_reminder: bool = True):
+    """
+    Splits sequence into n parts.
+    If keep_reminder is True last split will contain the reminder elements that dont fit into the length division
+    :param seq: Sequence
+    :param n: int
+    :param keep_reminder: bool
+    :return: list
+    """
+    if not isinstance(seq, Sequence):
+        raise TypeError('nsplit can only partition Sequence type')
+
+    split_len = round(len(seq) / n)
+
+    splits = []
+    for i in range(n):
+        splits.append(seq[split_len * i: split_len * i + split_len])
+    i += 1
+    reminder = tuple(seq[split_len * i: split_len * i + split_len])
+    if keep_reminder:
+        last = splits[-1]
+        last = list(last)
+        last.extend(list(reminder))
+        last = tuple(last)
+        splits[-1] = last
+    return splits
 
 def sequence_binary_mask(sequence, binary_mask: int = 0):
     """returns a generator of elements from sequence masked with a binary number.

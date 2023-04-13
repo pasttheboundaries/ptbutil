@@ -53,7 +53,7 @@ def RTW(sources: list, destination_dir, n_lines=1):
                             lines = tuple(tform(line) for line in lines)
                     if lines:
                         if not all(line.endswith('\n') for line in lines):
-                            raise RTWProtocolError('function must return a string line ending with a "\\n" sign')
+                            raise RTWProtocolError(r'function must return a string line ending with a "\n" sign')
                         else:
                             lines = ''.join(lines)
                             dfile.write(lines)

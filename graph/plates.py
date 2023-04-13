@@ -29,6 +29,7 @@ def _fix_array_dtype(array):
         array = (array == True).astype(int)
     return array
 
+
 def missing_data_plate(data: Union[np.ndarray, pd.DataFrame], title=None, dpi=200, figsize=(4, 4), columns=None,
                        interpolation='antialiased', nans=AbsentData):
     """
@@ -59,12 +60,14 @@ def missing_data_plate(data: Union[np.ndarray, pd.DataFrame], title=None, dpi=20
         data = pd.DataFrame(data)
 
     # changes declared nan values into np.nan, so it subsequently can be cut out by isna()
-    if nans is not AbsentData:
-        if isinstance(nans, (tuple, list, set)):
-            for nan in nans:
-                data = apply_nan(data, nan)
-        else:
-            data = apply_nan(data, nans)
+    if nans is AbsentData:
+        nans = ('', None, np.nan)
+
+    if isinstance(nans, (tuple, list, set)):
+        for nan in nans:
+            data = apply_nan(data, nan)
+    else:
+        data = apply_nan(data, nans)
 
     data = ~data.isna()
     data = data.values.astype(int)

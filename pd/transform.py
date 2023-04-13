@@ -103,14 +103,16 @@ def column_from_filename(df, filename, target_column, re_pattern) -> pd.DataFram
     return df
 
 
-def merge_cols(df: pd.DataFrame, columns, target_column, func):
+def merge_cols(df: pd.DataFrame, columns, target_column, func=None):
     """
 
     :param df: pd.DataFrame to be transformed
     :param columns: list of columns, re.Pattern or string to construct re.Pattern .
         re.Pattern will be used to extract columns names to be merged
     :param target_column: str - column name after merger
-    :param func: callable to ba applied over the rows of the relevant columns (axis=1)
+    :param func: callable to ba applied over the rows values of the relevant columns (axis=1)
+        default is lambda row: mean(row).
+        (Mind, if some vales in the row are equal to np.nan, numpy funcfions like sum or mean will return np.nan)
     :return:
     """
     col_re = None
@@ -126,10 +128,12 @@ def merge_cols(df: pd.DataFrame, columns, target_column, func):
     if col_re:
         columns = [col for col in df.columns if col_re.search(col)]
 
+    func = func or (lambda row: np.mean([val for val in row[~np.isnan(row)]]))
+
     newdf = pd.DataFrame()
     for col in [c for c in df.columns if c not in columns]:  # transport of irrelevant cols to newdf
         newdf[col] = df[col]
-    newdf[target_column] = [func(row) for row in df[columns].values]  # iteration over rows (0 axis of np.ndarray)
+    newdf[target_column] = pd.Series([func(row) for row in df[columns].values])  # iteration over rows (0 axis of np.ndarray)
 
     return newdf
 

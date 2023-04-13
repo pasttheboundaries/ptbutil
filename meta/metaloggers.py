@@ -5,6 +5,8 @@ from types import MethodType
 import logging
 from .loggingmanager import GlobalLoggerManager
 
+config = config.Config()
+config.LEVEL = 10
 
 handler = logging.StreamHandler()
 formatter = logging.Formatter('%(message)s')
