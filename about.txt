@@ -13,11 +13,8 @@ To keep all lemats of all known words in memory would take losts of resources.
 Also, querrying over such a set would be very time consumeing.
 StringTree solves this problem satisfactory.
 
-Quit a spectacular class in RomanNumeral also.
+Quite a functional class in RomanNumeral also.
 Never tested it for speed but, I believe, it excercises flawless encoding - decoding algorythm.
 It is also quite flexible.
 Made it a long time ago, and I am not sure about errors handling.
 I used it also for text data extraction
-
-
-
