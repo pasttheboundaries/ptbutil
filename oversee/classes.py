@@ -1,80 +1,42 @@
 
-
 from types import MethodType
 from functools import wraps
 from datetime import datetime
 from typing import Callable, Union, Optional, List, Tuple, Iterable, Any
+from collections import UserList, UserDict
+from .exceptions import OverseerError
 
 
-class OverseerError(Exception):
-    pass
+class InstanceOverseerHistory(UserList):
+
+    def append(self, activity_dump: dict) -> None:
+        # activity_dump is a dict
+        # good place to implement logging
+        return super().append(activity_dump)
 
 
-def dumb(x):
-    return x
+class OverseerRegistry(UserDict):
+    def __get__(self, instance, owner):
+        if not instance and type(owner) == type:
+            return self
+        if not id(instance) in self:
+            self[id(instance)] = InstanceOverseerHistory()
+        return self[id(instance)]
 
 
-def _index_or_default(ind, li: list, default):
-    if not isinstance(ind, int):
-        return ind
-    try:
-        new_val = li[ind]
-    except IndexError as ie:
-        if default is False:
-            raise OverseerError('Could not establish indexing while compiling registry.') from ie
-        if default is None:
-            new_val = ind
-        else:
-            new_val = default
-    return new_val
-
-
-def _dict_apply_values(d: dict, l: list, default: Any = None) -> dict:
-    """
-    ta implementacja jest bez sensu
-    overseer._registry przehowuje indeksy wpisów do history po to by móc zrekonstuować overseer.registry
-    zastępując indeksy wpisami z historii
-    To jest bardziej niż zbyteczne
-    Przerobiłem to w osobnym pakiecie oversee
-
-    helper function for Overseer register
-    applies values taken from the given list by item indexes to numeric (integer) values in a dict
-
-    eg:
-    >>> d = {'A': 1, 'B': 2, 'C': 3, 'D': 4}
-    >>> l = ['a', 'b', 'c', 'd']
-    >>> _dict_apply_values(d, l)
-    {'A': 'b', 'B': 'c', 'C': 'd', 'D': 4}
-
-    :param d: dict (to ammend)
-    :param l: list (values)
-    :param default: default value if integer > len(l) - 1
-    :return: dict
-    """
-    new_dict = dict()
-    for k, val in d.items():
-        if isinstance(val, int):
-            new_val = _index_or_default(val, l, default)
-        elif isinstance(val, dict):
-            new_val = _dict_apply_values(val, l, default)
-        elif isinstance(val, (list, tuple)):
-            new_val = [_index_or_default(v, l, default) for v in val]
-        else:
-            new_val = d[k]
-        new_dict[k] = new_val
-    return new_dict
-
-
-class Overseer():
+class Overseer:
 
     """
     Overseer is ment to me instantiated as an attribute of an instance
-    method oversee is meant to decorate object methods at runtime
+    Overseer.oversee method is meant to wrap the object methods at runtime.
+    For compile time decorators check oversee.decorators.
     """
-    def __init__(self, owner) -> None:
-        self.owner = owner
-        self._registry = dict()
-        self.history = []
+    registry = OverseerRegistry()
+
+    def __init__(self, path=None, mode='instance') -> None:
+        self.path = path  # TODO
+        self.mode = mode  # instance or class TODO
+
 
     @staticmethod
     def _compose_dump(store_args, store_times, owner, method_name, when, owner_attributes, text, *args,
@@ -101,18 +63,15 @@ class Overseer():
     @staticmethod
     def _compose_result(result, store_result) -> dict:
         if isinstance(store_result, bool):
-            store_result = dumb
-
-        if isinstance(store_result, Callable):
             pass
+        elif callable(store_result):
+            try:
+                result = store_result(result)
+            except (TypeError, ValueError):
+                result = 'Error at result transformation.'
         else:
-            raise TypeError('Overseer.oversee store_result parameter must be bool or a callable.')
-
-        try:
-            transformed_result = store_result(result)
-        except (TypeError, ValueError):
-            transformed_result = 'Error at result transformation.'
-        return {'result': transformed_result}
+            raise OverseerError from TypeError('Overseer.oversee store_result parameter must be bool or a callable.')
+        return result
 
     @staticmethod
     def manage_oversee_hook_calls(call_hook):
@@ -154,8 +113,8 @@ class Overseer():
             if True - method result will be stored
             if Callable, method result will be passed to the callable and result will be stored (eg. str)
         :param owner_attributes:
-            if True - all owner atributes will be stored
-            if list or tuple - indicated owner attributes will be stored
+            if True - all owner instance atributes will be stored (advised against)
+            if list or tuple - indicated owner instance attributes will be stored
             default is False
         :param before_call:
             if True: (default) method will be overseen before the method is called
@@ -176,28 +135,28 @@ class Overseer():
             before_call = True
 
         @wraps(method)
-        def wrapper_method(owner, *args, **kwargs):
+        def wrapper_method(owner_self, *args, **kwargs):
             nonlocal method_self, method_name, store_args, store_times, store_result, owner_attributes, text
             if before_call:
                 when = 'called'
-                dump = self._compose_dump(store_args, store_times, owner, method_name, when, owner_attributes, text,
+                dump = self._compose_dump(store_args, store_times, owner_self,
+                                          method_name, when, owner_attributes, text,
                                           *args, **kwargs)
-                self._registry[id(method_self)][method_name].append(len(self.history))
-                self.history.append(dump)
+                self.registry.append(dump)
                 self.manage_oversee_hook_calls(before_call)
 
             result = method(*args, **kwargs)
 
             if after_return:
                 when = 'returned'
-                dump = self._compose_dump(store_args, store_times, owner, method_name, when, owner_attributes, text,
+                dump = self._compose_dump(store_args, store_times, owner_self,
+                                          method_name, when, owner_attributes, text,
                                           *args, **kwargs)
 
                 if store_result:
-                    dump.update(self._compose_result(result, store_result))
+                    dump.update({'result': self._compose_result(result, store_result)})
 
-                self._registry[id(method_self)][method_name].append(len(self.history))
-                self.history.append(dump)
+                self.registry.append(dump)
                 self.manage_oversee_hook_calls(after_return)
 
             return result
@@ -205,10 +164,17 @@ class Overseer():
         new_method = MethodType(wrapper_method, method_self)
         method_self.__setattr__(method_name, new_method)
 
-        if id(method_self) not in self._registry:
-            self._registry[id(method_self)] = dict()
-        self._registry[id(method_self)][method_name] = []
-
     @property
-    def registry(self):
-        return _dict_apply_values(self._registry, self.history, False)
+    def history(self):
+        return self.registry
+
+
+class DescriptorOverseer:
+    """
+    Adds Overseer descriptor
+    """
+
+    def __get__(self, instance, owner):
+        if not hasattr(instance, '_overseer'):
+            instance._overseer = Overseer()
+        return instance._overseer

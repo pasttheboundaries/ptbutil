@@ -1,4 +1,4 @@
-from functools import wraps
+from functools import wraps, partial
 from sys import stdout
 from . import config
 from types import MethodType
@@ -16,6 +16,7 @@ handler.setLevel(config.LEVEL)
 #logger.addHandler(handler)
 #logger.setLevel(config.LEVEL)
 #GlobalLoggerManager.add(logger)
+
 
 def colored_text(text, n: int):
     backgrounds = range(255,231,-1)
@@ -122,7 +123,7 @@ class MethodMetaLogger(MetaLogger):
             return MethodMetaLogger.decorator(arg)
 
         elif isinstance(arg, int):
-            if not arg in (0, 10,20,30,40,50):
+            if not arg in (0, 10, 20, 30, 40, 50):
                 raise ValueError('Invalid logging.Level')
             return partial(MethodMetaLogger.decorator, level=arg)
         else:
