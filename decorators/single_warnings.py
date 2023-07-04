@@ -2,6 +2,11 @@ from functools import wraps
 import logging
 from types import FunctionType
 
+
+DEPRECATED_MESSAGE = 'is deprecated. It is not serviced and might trigger errors or produce false results.'
+EXPERIMENTAL_MESSAGE = 'is experimental. It is not validated and might trigger errors or produce false results.'
+
+
 def base_single_warning(fn, _message):
     """
     a decorator to mark deprecated functions or classes
@@ -43,3 +48,15 @@ def base_single_warning(fn, _message):
     else:
         raise TypeError('Missused decorator. Only FunctionType or type can be decorated.')
 
+
+def deprecated(fn):
+    _message = DEPRECATED_MESSAGE
+    return base_single_warning(fn, _message)
+
+
+obsolete = deprecated  # alias
+
+
+def experimental(fn):
+    _message = EXPERIMENTAL_MESSAGE
+    return base_single_warning(fn, _message)

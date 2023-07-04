@@ -13,8 +13,6 @@ handler.setLevel(10)
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.setLevel(10)
-# GlobalLoggerManager.add(logger)
-# logger.addFilter(meta_indentation_head)
 
 
 class PersistanceException(Exception):
