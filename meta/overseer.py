@@ -6,6 +6,7 @@ Overseer
 
 from types import MethodType
 from functools import wraps
+from itertools import chain
 from datetime import datetime
 from typing import Callable, Union, Iterable, Any
 from collections import defaultdict
@@ -13,118 +14,49 @@ from dataclasses import dataclass
 from functools import partial
 from ptbutil.errors import DecorationError
 
+
 class OverseerError(Exception):
     pass
 
 
-def dumb(x):
-    return x
+def cast_overseer_registry_object(obj):
+    if isinstance(obj, dict):
+        return {k: cast_overseer_registry_object(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [cast_overseer_registry_object(v) for v in obj]
+    elif isinstance(obj, int):
+        return int(obj)
+    elif isinstance(obj, float):
+        return float(obj)
+    elif isinstance(obj, OverseerHistoryItem):
+        return vars(obj)
+    else:
+        return obj
 
 
-def _index_or_default(ind, li: list, default):
-    if not isinstance(ind, int):
-        return ind
-    try:
-        new_val = li[ind]
-    except IndexError as ie:
-        if default is False:
-            raise OverseerError('Could not establish indexing while compiling registry.') from ie
-        if default is None:
-            new_val = ind
-        else:
-            new_val = default
-    return new_val
+class Castable:
+    def cast(self):
+        return cast_overseer_registry_object(self)
+
+class Fillable:
+    def fill(self):
+        return apply_overseer_history_items(self)
 
 
-def _dict_apply_values(d: dict, l: list, default: Any = None) -> dict:
-    """
-    ta implementacja jest bez sensu
-    overseer.registry przehowuje indeksy wpisów do history po to by móc zrekonstuować overseer.registry
-    zastępując indeksy wpisami z historii
-    To jest bardziej niż zbyteczne
-    Przerobiłem to w osobnym pakiecie oversee
-
-    helper function for Overseer register
-    applies values taken from the given list by item indexes to numeric (integer) values in a dict
-
-    eg:
-    >>> d = {'A': 1, 'B': 2, 'C': 2, 'D': 4}
-    >>> l = ['a', 'b', 'c', 'd']
-    >>> _dict_apply_values(d, l)
-    {'A': 'b', 'B': 'c', 'C': 'c', 'D': 4}
-
-    :param d: dict (to ammend)
-    :param l: list (values)
-    :param default: default value if integer > len(l) - 1
-    :return: dict
-    """
-    new_dict = dict()
-
-    for k, val in d.items():
-        if isinstance(val, int):
-            new_val = _index_or_default(val, l, default)
-        elif isinstance(val, dict):
-            new_val = _dict_apply_values(val, l, default)
-        elif isinstance(val, (list, tuple)):
-            new_val = [_index_or_default(v, l, default) for v in val]
-        else:
-            new_val = d[k]
-        new_dict[k] = new_val
-    return new_dict
-
-
-class ReducedOverseerRegistry(dict):
+class OverseerRegistryObject(Castable, Fillable):
     pass
 
 
-class OverseerRegistryDict(defaultdict):
-    def reduce(self):
-        reduced = ReducedOverseerRegistry()
-        for k, v in self.items():
-            if len(v) == 1:
-                vkey = tuple(v.keys())[0]
-                reduced[k] = v[vkey]
-            else:
-                reduced[k] = dict[v]
-        return reduced
-
-    def cast(self):
-        return {k: dict(v) for k, v in self.items()}
+class OverseerHistory(list, OverseerRegistryObject):
+    pass
 
 
-def OverseerInstanceRegistry():
-    return defaultdict(list)
-
-
-class OverseerRegistry:
-    def __init__(self):
-        self.registry = OverseerRegistryDict(OverseerInstanceRegistry)
-
-
-    # this will be not necessary as __get__ can direct straight to owner instance reristy lists
-    # def __getitem__(self, indices):
-    #     if not (isinstance(indices, tuple) and len(indices) == 2):
-    #         raise ValueError(f'two indices must be given')
-    #     a, b = indices
-    #     return self.registry[a][b]
-
-    # this will be not necessary as __get__ can direct straight to owner instance reristy lists
-    # def __setitem__(self, indices, val):
-    #     if not (isinstance(indices, tuple) and len(indices) == 2):
-    #         raise ValueError(f'two indices must be given')
-    #     a, b = indices
-    #     self.registry[a][b].append(val)
-
-    def __get__(self, ovs_instance, ovs_class) -> Union[list, dict]:
-        if not ovs_instance:
-            return self.registry
-        else:
-            return self.registry[ovs_instance.owner_instance.__class__.__name__][id(ovs_instance.owner_instance)]
-
+class OverseerHistoryIndex(int, OverseerRegistryObject):
+    pass
 
 
 @dataclass
-class OverseerHistoryItem:
+class OverseerHistoryItem(OverseerRegistryObject):
     owner_class: str = None
     owner_instance_id: int = None
     method: str = None
@@ -137,8 +69,97 @@ class OverseerHistoryItem:
     result: Any = None
 
 
-class OverseerHistory(list):
+def apply_overseer_history_items(obj: OverseerRegistryObject) -> Union[OverseerRegistryObject, OverseerHistory]:
+    """
+    """
+    if isinstance(obj, OverseerRegistryDict):
+        new = obj.__class__()
+        for k, v in obj.items():
+            new[k] = apply_overseer_history_items(v)
+        return new
+    elif isinstance(obj, OverseerRegistryIndicesList):
+        return OverseerHistory(apply_overseer_history_items(i) for i in obj)
+    elif isinstance(obj, OverseerHistoryIndex):
+        return Overseer.history[obj]
+    else:
+        raise OverseerError from RuntimeError(f'Could not perform register fill with {obj}')
+
+
+class ReducedOverseerRegistry(dict):
+    """default type for reduced dict"""
     pass
+
+
+class OverseerRegistryDict(defaultdict, OverseerRegistryObject):
+    pass
+
+
+class OverseerRegistryPrimaryDict(OverseerRegistryDict):
+    """
+    OverseerRegistryPrimaryDict is the main dict of OverseerRegistry:
+    the keys are overseen instance.__class__.__name__
+        the values are dicts where keys are id(instance) (type int)
+    it implements 3 methods:
+    fill: uses the stored indices to build the copy of self filled with values acquired from Overseer.history
+        The return object is also OverseerRegistryPrimaryDict so further reduce or cast methods can be exercised
+        However the returned object is a copy of the orifinal one.
+    reduce: returns a ReducedOverseerRegistry:
+        the secondary dict values are moved and ascribed to the primary dict (__class__.__name__)
+    cast: casts the default types to built-in types (dict and list)
+    """
+
+    def reduce(self):
+        reduced = ReducedOverseerRegistry()
+        for k, v in self.items():
+            reduced[k] = OverseerHistory(chain(*list(v.values())))
+        return reduced
+
+
+class OverseerRegistrySecondaryDict(OverseerRegistryDict):
+    """
+    OverseerRegistryPrimaryDict is the main dict of OverseerRegistry:
+    the keys are overseen instance.__class__.__name__
+        the values are dicts where keys are id(instance) (type int)
+    it implements 3 methods:
+    fill: uses the stored indices to build the copy of self filled with values acquired from Overseer.history
+        The return object is also OverseerRegistryPrimaryDict so further reduce or cast methods can be exercised
+        However the returned object is a copy of the orifinal one.
+    reduce: returns a ReducedOverseerRegistry: in case only one instance of a class is overseen,
+        the secondary dict values are moved and ascribed to the primary dict (__class__.__name__)
+    cast: casts the default types to built-in types (dict and list)
+    """
+    pass
+
+
+class OverseerRegistryIndicesList(list, OverseerRegistryObject):
+    pass
+
+
+def secondary_dict_factory():
+    """factory for defaulr secondary dict of OverseerRegistry"""
+    return OverseerRegistrySecondaryDict(OverseerRegistryIndicesList)
+
+
+def get_overseer_registry_primary_dict():
+    return OverseerRegistryPrimaryDict(secondary_dict_factory)
+
+
+class OverseerRegistry:
+    """
+    a descriptor registry for Overseer class
+    data is stored in OverseerRegistry.registry - the pirmary dict that holds secondary dicts that hold lists of indices
+        the indices are to identify history items.
+        As the Overseer history stores the actual records of the Overseer.
+    """
+
+    def __set_name__(self, ovs_class, name):
+        ovs_class._registry = get_overseer_registry_primary_dict()
+
+    def __get__(self, ovs_instance, ovs_class) -> Union[list, dict]:
+        if not ovs_instance:
+            return ovs_class._registry
+        else:
+            return ovs_class._registry[ovs_instance.owner_instance.__class__.__name__][id(ovs_instance.owner_instance)]
 
 
 class Overseer:
@@ -151,6 +172,7 @@ class Overseer:
 
     def __init__(self, owner_instance) -> None:
         self.owner_instance = owner_instance
+        owner_instance.overseer = self
 
     @staticmethod
     def _compose_dump(store_args, store_times, owner_instance, method_name, when, owner_attributes, text, args,
@@ -267,7 +289,7 @@ class Overseer:
                     when = 'called'
                     dump = self._compose_dump(store_args, store_times, owner_instance, method_name, when, owner_attributes, text,
                                               args, kwargs, None)
-                    self.registry.append(len(self.history))
+                    self.registry.append(OverseerHistoryIndex(len(self.history)))
                     self.history.append(dump)
                 self._manage_oversee_hook_calls(before_call)
 
@@ -283,7 +305,7 @@ class Overseer:
                     dump = self._compose_dump(store_args, store_times, owner_instance, method_name, when, owner_attributes, text,
                                               args, kwargs, dump_result)
 
-                    self.registry.append(len(self.history))
+                    self.registry.append(OverseerHistoryIndex(len(self.history)))
                     self.history.append(dump)
                 self._manage_oversee_hook_calls(after_return)
 
@@ -301,7 +323,9 @@ class DescriptorOverseer:
 
     def __get__(self, instance, owner):
         if not hasattr(instance, '_overseer'):
-            instance._overseer = Overseer()
+            instance._overseer = Overseer(instance)
+            ### THIS CAUSES CONFLICT as Overseer instals itself in instance.overseer attribute
+
         return instance._overseer
 
 
@@ -312,7 +336,7 @@ def _decorate_class(cls, *args, **kwargs):
     def __init__(_self, *instance_args, **instance_kwargs):
         old_init(_self, *instance_args, **instance_kwargs)
 
-        _self.overseer = Overseer()
+        _self.overseer = Overseer(_self)
 
         for arg in args:
             if not isinstance(arg, str):
