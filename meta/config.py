@@ -3,10 +3,12 @@ import yaml
 
 
 class Config:
-    
-    def from_dict(self, config_dict):
+    @classmethod
+    def from_dict(cls, config_dict):
+        config = cls()
         for k, v in config_dict.items():
-            self.__setattr__(k, v)
+            config.__setattr__(k, v)
+        return config
 
     @classmethod
     def from_yaml(cls, path):
