@@ -5,7 +5,7 @@ Decay is an abstract parameter that with each retrieval (Decay.value) decays tow
 import numpy as np
 from matplotlib import pyplot as plt
 from collections.abc import Iterable
-from collections import namedtuple
+from itertools import takewhile
 
 
 def invert(v):
@@ -84,127 +84,108 @@ class Hyperbola:
         self.c = desired_c
 
 
+class Ticker(int):
+    def __init__(self):
+        self.ticker = 0
+        self.registry = []
+
+    def tick(self, n=None):
+        n = n or 1
+        self.ticker += n
+
+    def flush(self):
+        self.registry.append(self.ticker)
+        self.ticker = 0
+
+    @property
+    def last_ones(self):
+        return len(tuple(takewhile(lambda x: x == 1, self.registry[::-1])))
+
+
 class Adapter:
 
-    N_WARM_UP = 3
+    N_WARM_UP = 2  # number of steps before adaptation is used in next value prediction
     N_DECAY = 5  # number of nudges at which decay will become very small (0.1% drop over one step)
-    N_ASYMPTOTE = 5  # steps needed to asymptote reach
-    N_NUDGE = 5  # steps needed to decrease nudge
-    ASYMPTOTE_BACKUP_RATE = 0.9  # factor to multiply current asymptote if above fail value
-    NUDGE_DECAY_BACKUP_RATE = 0.1  # facter to increse nudge decay if below fail value
-    NUDGE_EXCESS = 0.05  # above fail value
 
     def __init__(self, decay):
         self.decay = decay
-        self.registry = list()
         self.decay_rate_curve = Hyperbola(-1, 0, 1)
         self.decay_rate_curve.adjust_rate(0, self.decay.decay, self.N_DECAY, 0.999)
 
-        self.decay_asymptote_curve = Hyperbola(-self.decay.c, 0, self.decay.start)
-        self.decay_asymptote_curve.adjust_rate(self.step, self.decay.asymptote,
-                                               self.step + self.N_ASYMPTOTE, self.decay.start * 0.99)
-
-        self.decay_nudge_curve = Hyperbola(self.decay.c, 0, 0)
-        self.decay_nudge_curve.adjust_rate(self.step, self.decay.start,
-                                           self.step + self.N_NUDGE, self.decay.start * self.decay.nudge_by * 0.01)
-        self.to_be_set_decay_asymptote = None
-        self.to_be_set_nudge_value = None
+        self.next_asymptote = None
+        self.next_nudge = None
         self.to_be_set_decay_rate = None
-
-    def record(self, rec):
-        if not isinstance(rec, NudgeRecord):
-            raise TypeError('must be NudgeRecord')
-        self.registry.append(rec)
-        self.adjust()
-        if self.step >= 0:  # active since n = 0
-            return True
-        else:
-            return False
+        self.fails = []
 
     @property
     def step(self):
-        return len(self.registry) - self.N_WARM_UP  # 0 is after N_WARM_UP steps od the owner Decay
+        return len(self.fails) - self.N_WARM_UP
 
     def adjust(self):
-        user_asymptote = self.decay.asymptote
-        # [-self.N_WARM_UP:]
-        mean_past_fail_value = np.mean(np.array([r.y1 for r in self.registry]))
-        mean_past_nudge_value = np.mean(np.array([r.y2 for r in self.registry]))
-        # expected_v = (mean_past_nudge_value + mean_past_fail_value) / 2   # expected fail value = optimum decay value
-        #                                                         # halfway between nudge and fail value
-        expected_v = mean_past_fail_value
+        """
+        calculates next nudge and next asymptote values
+        from the probbability of fail values
+        """
+        if self.fails:
+            mean_fails = np.mean(np.array(self.fails))
+            std_fails = np.std(self.fails)
+        else:
+            mean_fails = 0
+            std_fails = 0
 
-        # ASYMPTOTE CURVE
-        # calculations
-        next_decay_asymptote = self.decay_asymptote_curve.value(self.step)  # asymptote to be set at this nudge
-        relative_diff = abs(expected_v - user_asymptote)
-
-        target_asymptote = expected_v
-        target_nearly_asymptote = expected_v - self.decay.c * relative_diff * 0.05  # target nearly asymptote - 5%
+        last_ones = self.decay.ticker.last_ones
+        direction = self.decay.c
 
         if self.step < 0:
-            # this keeps decay_asymptote_curve at the user set value while warming up
-            # otherwise it would flip the curve as to_be_set_decay_asymptote might be above expected_v during warmup
-            next_decay_asymptote = user_asymptote
+            next_asymptote = self.decay.asymptote
+            next_nudge = self.decay.start
         else:
-            pass
+            next_asymptote = mean_fails + (direction * 1 * std_fails)
+            next_nudge = mean_fails + \
+                (direction * 2 * std_fails) + \
+                (direction * last_ones * 0.5 * std_fails)  # surplus for multiple single attempt fails
 
-            # overshoot correction
-            to_b_set_v_diff = abs(next_decay_asymptote - user_asymptote)
-            target_diff = abs(target_nearly_asymptote - user_asymptote)
-            if to_b_set_v_diff >= target_diff:
-                next_decay_asymptote = user_asymptote + self.decay.c * target_diff * self.ASYMPTOTE_BACKUP_RATE
-        self.to_be_set_decay_asymptote = next_decay_asymptote
+        if next_nudge == next_asymptote:
+            all_interval = self.decay.start, self.decay.asymptote, *self.fails
+            mean_all_interval = np.mean(all_interval)
+            std_all_interval = np.std(all_interval)
+            next_nudge = mean_all_interval + \
+                (direction * 1 * std_all_interval) + \
+                (direction * last_ones * 0.5 * std_all_interval)  # surplus for multiple single attempt fails
+            next_asymptote = mean_all_interval - \
+                (direction * 2 * std_all_interval) - \
+                (direction * last_ones * 0.5 * std_all_interval)  # surplus for multiple single attempt fails
 
-        # setting
-        self.decay_asymptote_curve.v = target_asymptote
-        self.decay_asymptote_curve.adjust_rate(self.step, next_decay_asymptote,
-                                               self.step + self.N_ASYMPTOTE, target_nearly_asymptote)
-
-        # NUDGE CURVE (absolute values)
-        # calculations
-        to_be_set_nudge_value = self.decay_nudge_curve.value(self.step)
-        nudge_asymptote = expected_v + self.decay.c * abs(expected_v) * self.NUDGE_EXCESS
-        nudge_nearly_asymptote = expected_v + self.decay.c * abs(expected_v) * (self.NUDGE_EXCESS * 2)
-        last_fail = self.registry[-1].y1
-
-        if abs(to_be_set_nudge_value - user_asymptote) < abs(last_fail - user_asymptote):
-            to_be_set_nudge_value = last_fail + self.decay.c * abs(last_fail) * self.NUDGE_DECAY_BACKUP_RATE
-        else:
-            pass
-        self.to_be_set_nudge_value = to_be_set_nudge_value
-        # setting
-        self.decay_nudge_curve.v = nudge_asymptote
-        self.decay_nudge_curve.adjust_rate(self.step, mean_past_nudge_value, self.step + self.N_NUDGE, nudge_nearly_asymptote)
+        self.next_nudge = next_nudge
+        self.next_asymptote = next_asymptote
+        print(
+            f'mean_fails {mean_fails}\t\tnext_nudge '
+            f'{self.next_nudge}\t\tnext asymptote {self.next_asymptote}\t\t last ones {last_ones}')
 
         # DELAY CURVE
-        # setting
-        self.to_be_set_decay_rate = self.decay_rate_curve.value(self.step)
+        if self.step >= 0:
+            self.to_be_set_decay_rate = self.decay_rate_curve.value(self.step)
         # decay curve needs no adjustment as the only parameter defining it is self.N_DECAY
         # because it always tends to 1 (100% of the previous decay
-
-        # print(f'___ Decay step {self.decay.step - 1}; Adapter step {self.step}; Will adapt : {self.step >=0}\n'
-        #       f'--- Failed at {self.decay.previous}; Current nudge {self.to_be_set_nudge_value}; expected_v:{expected_v}\n '
-        #       f'--- current Decay {self.decay.value}; current Decay asymptote {self.to_be_set_decay_asymptote}; planned Decay asymptote {target_asymptote}\n'
-        #       f'--- Decay rate {self.decay_rate_curve.value(self.to_be_set_decay_rate)}; Decay rate asymptote {self.decay_rate_curve.v}\n'
-        #       f'--- next nudge {self.to_be_set_nudge_value}; Next nudge {mean_past_nudge_value}; Nudges asymptote {nudge_asymptote}')
 
     def adapt(self):
         """
         this is called by Decay if conditions are met
-        :return:
         """
-        self.record(NudgeRecord(self.decay.step - self.decay._last_nudge_step, self.decay.previous, self.to_be_set_nudge_value))
+        if self.step < 0:
+            raise RuntimeError(f'adaptation has been called before warm-up has completed')
+        self.decay.ticker.flush()
+        self.fails.append(self.decay.previous)
+        self.adjust()
+
         # adjusting asymptote
-        self.decay.curve.v = self.to_be_set_decay_asymptote
+        self.decay.curve.v = self.next_asymptote
         # nudging must be done here as adapte must controll all the prformance of the Decay curve
-        self.decay.curve.shift_h(self.decay.step, self.to_be_set_nudge_value)
+        self.decay.curve.shift_h(self.decay.step, self.next_nudge)
         # adjusting decay
         self.decay.decay = self.to_be_set_decay_rate
 
-
-class NudgeRecord(namedtuple('NudgeRecord', field_names='steps y1 y2')):
-    pass
+        self.decay._nudged = True
 
 
 class Decay:
@@ -233,23 +214,37 @@ class Decay:
                 second one is an array of the calculated values
                 and also makes n steps
 
-            nudge(by: float) - the delivered value will be altered,
+            nudge(by: float) - the next delivered value will be altered,
                 by the passed value (or the nudge value set at instantiation). See parameter nudge.
 
         attributes:
             value: current value
             step: current step
 
+        work cycle is
+        deliver value
+        ↓
+        ↓ (nudge)
+        ↓
+        record las fail (in Decay.adapter.fails)
+        ↓
+        plan nudge and asymptote or use one delivered by user (at adapter warm-up)
+        ↓
+        deliver nudge and set asymptote
+        ↓
+        continue delivering values
+
         """
+    UNHOOK = 1000  # number of steps neede to onhook the asymptote
 
     def __init__(self, start, asymptote=0, decay=0.5, nudge=1, adapt=True):
         self.start = start
         self.asymptote = asymptote
+        self.adapt = adapt
         nudge = nudge or 0
         self._step = 0
-        self._last_nudge_step = self.step
-        self.adapt = adapt
         self._nudged = False
+        self.ticker = Ticker()
 
         if start > asymptote:
             self.c = 1
@@ -270,6 +265,7 @@ class Decay:
         self.decay = decay
         # setting adapter
         self.adapter = Adapter(self)
+        self.last_unhook = 2
 
     @property
     def value(self):
@@ -277,7 +273,7 @@ class Decay:
 
     @property
     def previous(self):
-        return self.curve.value(self.step-1)
+        return self.curve.value(max(self.step - 1, 0))
 
     @property
     def step(self):
@@ -310,61 +306,66 @@ class Decay:
         after_step_x = self._step + 1
         self.curve.adjust_rate(current_x, current_y, after_step_x, after_step_y)
 
-    def deliver(self, n=None, plot=False):
+    def deliver(self, n=None, plot=False, xs=False):
         """
         Delivers n coordinates as a tuple of numpy array : (array(xs), array(ys))
-        (the arrays length is equal to n)
+        (the array lengths equal to n)
         and makes n steps ahead
         :param n:
         :param plot:
+        :param xs: bool if True a tuple will be returned (xs, ys). If False just ys will be returned.
         :return:
         """
         if n is None:
-            return self.deliver(1, plot=plot)[1][0]
-        xs = np.arange(n) + self._step
-        self._step += n
-        self._nudged = False
-        coor = self.curve.coordinates(xs)
-        if plot:
-            plt.plot(*coor, '.')
+            coor = self.step, self.value()
 
+        else:
+            xs_array = np.arange(n) + self._step
+            coor = self.curve.coordinates(xs_array)
+            if plot:
+                plt.plot(*coor, '.')
+
+        self._nudged = False
+        self._step += n
+        self.ticker.tick(n)
+
+        if not xs:
+            coor = coor[1]
         return coor
 
-    def nudge(self, by=None):
-        by = by or self.nudge_by
-        if not 0 < by:
-            raise ValueError(
-                f'nudge by is expected to be a percentage of value ath wich the nudge is done, and must be  0 < x . '
-                f'Where 1 = 100%. Got {by}')
-        if not by:
-            raise ValueError('Nudge value must be passed or declared at instantiation.')
-        self.nudge_by_percent(by)
+    def nudge(self):
+        if self.adapt and self.adapter.step >= 0:
+            self.adapter.adapt()
+        else:
+            required_y = self.previous + (self.c * abs(self.previous - self.curve.v))
+            next_after_nudge = abs(self.decay * (self.previous - self.curve.v))
+            if abs(required_y - self.curve.v) < next_after_nudge:  # too small nudge
+                pass
+            else:
+                return self.nudge_to_value(required_y)
 
     def nudge_by_percent(self, percent):
-        current_y = self.curve.value(self.step)
-        # print(f'current value = {current_y}')
-        value = self.c * abs(current_y * percent)
+        """
+        nudges the value by the percent of the last value
+        :param percent:  0 < percent < 1
+        :return:
+        """
+        relative = self.previous - self.curve.v
+        value = self.c * abs(relative * percent)
         self.nudge_by_value(value)
 
     def nudge_by_value(self, value):
-        # print(f'nudging by value {value}')
-        current_y = self.curve.value(self.step)
-        required_y = current_y + value
-        # print(f'nudging to value {required_y}')
+        required_y = self.previous + value
         self.nudge_to_value(required_y)
 
     def nudge_to_value(self, value):
         if self._nudged:
-            raise UserError('Decay can not be nudged twice in row. To achieve bigger nudge set nudge value.')
-        adaptation_warmed_up = self.adapter.step >= 0
-        if adaptation_warmed_up and self.adapt:
-            self.adapter.adapt()
-        else:
-            next_nudge_value = value
-            self.adapter.record(NudgeRecord(self.step - self._last_nudge_step, self.previous, next_nudge_value))
-            self.curve.shift_h(self.step, next_nudge_value)
+            raise UserError('Decay can not be nudged twice at the same step. To achieve bigger nudge set nudge value.')
 
-        self._last_nudge_step = self.step
+        self.ticker.flush()
+        self.adapter.fails.append(self.previous)
+
+        self.curve.shift_h(self.step, value)
         self._nudged = True
 
     def __repr__(self):
