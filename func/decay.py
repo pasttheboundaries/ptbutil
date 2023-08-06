@@ -84,7 +84,7 @@ class Hyperbola:
         self.c = desired_c
 
 
-class Ticker(int):
+class Ticker:
     def __init__(self):
         self.ticker = 0
         self.registry = []
@@ -104,13 +104,43 @@ class Ticker(int):
 
 class Adapter:
 
-    N_WARM_UP = 2  # number of steps before adaptation is used in next value prediction
-    N_DECAY = 5  # number of nudges at which decay will become very small (0.1% drop over one step)
+    """
+    development note: nudge reduction is experimental
+    to remove this feature:
+        remove: STD_NUDGE_ASYMPTOTE
+        remove: self.nudge_rate = Hyperbola(self.STD_NUDGE, 0, self.STD_NUDGE_ASYMPTOTE)
+        remove: self.nudge_rate.adjust_rate(0, self.STD_NUDGE, 1, self.STD_NUDGE * 0.7)
+        alter:
+            next_nudge = mean_fails + \
+                         (direction * self.nudge_rate.value(self.step) * std_fails) + \
+                         (direction * last_ones * 0.5 * std_fails)  # surplus for multiple single attempt fails
+        to:
+            next_nudge = mean_fails + \
+                         (direction * self.STD_NUDGE * std_fails) + \
+                         (direction * last_ones * 0.5 * std_fails)  # surplus for multiple single attempt fails
+
+        alter:
+            STD_NUDGE = 3
+        to:
+            STD_NUDGE = 2
+    """
+
+    N_WARM_UP = 1  # number of steps before adaptation is used in next value prediction
+    N_DECAY = 5  # number of nudges at which rate will become very small (0.1% drop over one step)
+    STD_NUDGE = 3  # factor the fail distribution std will be multiplied by when deciding the next nudge value
+    # STD_NUDGE will be subject tu hyperbolic decrease towards asymptote
+    STD_NUDGE_ASYMPTOTE = 1.1  # the asymptote for deceasing STD_NUDGE
+    # STD_NUDGE_ASYMPTOTE must be > STD_ASYMPTOTE
+    STD_ASYMPTOTE = 1  # factor the fail distribution std will be multiplied by when deciding the next acymptote
 
     def __init__(self, decay):
         self.decay = decay
-        self.decay_rate_curve = Hyperbola(-1, 0, 1)
-        self.decay_rate_curve.adjust_rate(0, self.decay.decay, self.N_DECAY, 0.999)
+        self.decay_rate = Hyperbola(-1, 0, 1)
+        self.decay_rate.adjust_rate(0, self.decay.rate, self.N_DECAY, 0.999)
+
+        # nudge reduction curve
+        self.nudge_rate = Hyperbola(self.STD_NUDGE, 0, self.STD_NUDGE_ASYMPTOTE)
+        self.nudge_rate.adjust_rate(0, self.STD_NUDGE, 1, self.STD_NUDGE * 0.7)
 
         self.next_asymptote = None
         self.next_nudge = None
@@ -135,26 +165,40 @@ class Adapter:
 
         last_ones = self.decay.ticker.last_ones
         direction = self.decay.c
+        user_asymptote = self.decay.init_asymptote
 
         if self.step < 0:
             next_asymptote = self.decay.asymptote
             next_nudge = self.decay.start
         else:
-            next_asymptote = mean_fails + (direction * 1 * std_fails)
             next_nudge = mean_fails + \
-                (direction * 2 * std_fails) + \
-                (direction * last_ones * 0.5 * std_fails)  # surplus for multiple single attempt fails
+                         (direction * self.nudge_rate.value(self.step) * std_fails) + \
+                         (direction * last_ones * 0.5 * std_fails)  # surplus for multiple single attempt fails
+            next_asymptote = mean_fails + (direction * self.STD_ASYMPTOTE * std_fails)
 
         if next_nudge == next_asymptote:
-            all_interval = self.decay.start, self.decay.asymptote, *self.fails
+            all_interval = self.decay.start, self.decay.init_asymptote, *self.fails
             mean_all_interval = np.mean(all_interval)
             std_all_interval = np.std(all_interval)
             next_nudge = mean_all_interval + \
                 (direction * 1 * std_all_interval) + \
                 (direction * last_ones * 0.5 * std_all_interval)  # surplus for multiple single attempt fails
-            next_asymptote = mean_all_interval - \
-                (direction * 2 * std_all_interval) - \
-                (direction * last_ones * 0.5 * std_all_interval)  # surplus for multiple single attempt fails
+
+            if direction == 1:
+                next_asymptote = max(
+                    user_asymptote,
+                    mean_all_interval -
+                    (direction * 2 * std_all_interval) -
+                    (direction * last_ones * 0.5 * std_all_interval)
+                )  # surplus for multiple single attempt fails
+            else:
+                next_asymptote = min(
+                    user_asymptote,
+                    mean_all_interval -
+                    (direction * 2 * std_all_interval) -
+                    (direction * last_ones * 0.5 * std_all_interval)
+                )  # surplus for multiple single attempt fails
+
 
         self.next_nudge = next_nudge
         self.next_asymptote = next_asymptote
@@ -164,9 +208,9 @@ class Adapter:
 
         # DELAY CURVE
         if self.step >= 0:
-            self.to_be_set_decay_rate = self.decay_rate_curve.value(self.step)
-        # decay curve needs no adjustment as the only parameter defining it is self.N_DECAY
-        # because it always tends to 1 (100% of the previous decay
+            self.to_be_set_decay_rate = self.decay_rate.value(self.step)
+        # rate curve needs no adjustment as the only parameter defining it is self.N_DECAY
+        # because it always tends to 1 (100% of the previous rate
 
     def adapt(self):
         """
@@ -182,8 +226,9 @@ class Adapter:
         self.decay.curve.v = self.next_asymptote
         # nudging must be done here as adapte must controll all the prformance of the Decay curve
         self.decay.curve.shift_h(self.decay.step, self.next_nudge)
-        # adjusting decay
-        self.decay.decay = self.to_be_set_decay_rate
+        self.decay.last_nudge = self.next_nudge
+        # adjusting rate
+        self.decay.rate = self.to_be_set_decay_rate
 
         self.decay._nudged = True
 
@@ -194,18 +239,18 @@ class Decay:
         The instantiation parameters are:
             start - an initial value
             asymptote - the target value - never to be reached
-            decay - initial decay value - the percentage of initial value to be reached in the next step.
+            rate - initial rate value - the percentage of initial value to be reached in the next step.
                 The subsequent steps will return different values depending on the initial value and the asymptote,
-                The reate of the values decay (towards the asymptote) is steered by the first step decay.
-                eg: If initial value is 4, asymptote 0, and decay is 0.5, the second value will be 2,
+                The reate of the values rate (towards the asymptote) is steered by the first step rate.
+                eg: If initial value is 4, asymptote 0, and rate is 0.5, the second value will be 2,
                 and the subsequent values, will follow the hiperbolic curve towards 0.
                 The curve first two points are (0,4) and (1,2).
             nudge: Optional - the percent of the fail value (the value at witch a nudge was dane
                 the delivered (next) value will be insreased by, so it is further away from the asymptote.
                 eg:
-                In the descending decay curve:
+                In the descending rate curve:
                     if the last delivered value was 3 and nudge is set to 0.1, the next delivered value will be 3.3
-                In the ascending decay curve:
+                In the ascending rate curve:
                     if the last delivered value was 3 and nudge is set to 0.11, the next delivered value will be 2.7
                 The safest and usually efficient value is 1 (100%)
         methods:
@@ -237,14 +282,14 @@ class Decay:
         """
     UNHOOK = 1000  # number of steps neede to onhook the asymptote
 
-    def __init__(self, start, asymptote=0, decay=0.5, nudge=1, adapt=True):
+    def __init__(self, start, asymptote=0, rate=0.5, nudge=1, adapt=True):
         self.start = start
-        self.asymptote = asymptote
         self.adapt = adapt
-        nudge = nudge or 0
+        self.nudge_by = nudge or 0
         self._step = 0
         self._nudged = False
         self.ticker = Ticker()
+        self.last_nudge = start
 
         if start > asymptote:
             self.c = 1
@@ -257,12 +302,11 @@ class Decay:
         else:
             raise ValueError('start valaue can not be equal to asymptote.')
 
-        self.nudge_by = nudge
-
         # shaping the curve
         self.curve = Hyperbola(self.c, 1, asymptote)  # h = 1 so the value for step 0 = v + 1
+        self.asymptote = self.init_asymptote = asymptote
         self.curve.shift_h(0, start)
-        self.decay = decay
+        self.rate = rate
         # setting adapter
         self.adapter = Adapter(self)
         self.last_unhook = 2
@@ -280,30 +324,31 @@ class Decay:
         return self._step
 
     @property
-    def decay(self):
-        return self._decay
+    def rate(self):
+        return self._rate
 
-    @decay.setter
-    def decay(self, x) -> None:
-        self._decay = x
-        self.solve_decay(x)
+    @rate.setter
+    def rate(self, x) -> None:
+        self._rate = x
+        self.solve_rate(x)
 
-    def solve_decay(self, drop) -> None:
+    @property
+    def asymptote(self):
+        return self.curve.v
+
+    @asymptote.setter
+    def asymptote(self, val):
+        self.curve.v = val
+
+    def solve_rate(self, drop) -> None:
         if not 0 < drop < 1:
             raise ValueError(
                 f'one_step_drop is expected to be a percentage of value drop after one step, and must be  0 < x < 1. '
                 f'Got {drop}')
-        current_y = self.curve.value(self._step)
-
-        current_x = self._step
-        if self.c == 1:
-            diff = current_y - self.asymptote
-            after_step_y = current_y - (diff * (1 - drop))
-        else:
-            diff = self.asymptote - current_y
-            after_step_y = current_y + (diff * (1 - drop))
-
-        after_step_x = self._step + 1
+        current_y = self.curve.value(self.step)
+        current_x = self.step
+        after_step_y = current_y - ((current_y - self.asymptote) * (1 - drop))
+        after_step_x = self.step + 1
         self.curve.adjust_rate(current_x, current_y, after_step_x, after_step_y)
 
     def deliver(self, n=None, plot=False, xs=False):
@@ -317,8 +362,8 @@ class Decay:
         :return:
         """
         if n is None:
-            coor = self.step, self.value()
-
+            n = 1
+            coor = self.step, self.value
         else:
             xs_array = np.arange(n) + self._step
             coor = self.curve.coordinates(xs_array)
@@ -338,11 +383,7 @@ class Decay:
             self.adapter.adapt()
         else:
             required_y = self.previous + (self.c * abs(self.previous - self.curve.v))
-            next_after_nudge = abs(self.decay * (self.previous - self.curve.v))
-            if abs(required_y - self.curve.v) < next_after_nudge:  # too small nudge
-                pass
-            else:
-                return self.nudge_to_value(required_y)
+            return self.nudge_to_value(required_y)
 
     def nudge_by_percent(self, percent):
         """
@@ -366,6 +407,7 @@ class Decay:
         self.adapter.fails.append(self.previous)
 
         self.curve.shift_h(self.step, value)
+        self.last_nudge = value
         self._nudged = True
 
     def __repr__(self):

@@ -5,13 +5,12 @@ Overseer
 """
 
 from types import MethodType
-from functools import wraps
+from functools import wraps, partial
 from itertools import chain
 from datetime import datetime
 from typing import Callable, Union, Iterable, Any
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import partial
 from ptbutil.errors import DecorationError
 
 

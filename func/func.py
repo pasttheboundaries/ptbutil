@@ -2,6 +2,7 @@ import copy
 import types
 import functools
 
+
 def copy_func(f, globals=None, module=None):
     """Based on https://stackoverflow.com/a/13503277/2988730 (@unutbu)"""
     if globals is None:
@@ -13,5 +14,3 @@ def copy_func(f, globals=None, module=None):
         g.__module__ = module
     g.__kwdefaults__ = copy.copy(f.__kwdefaults__)
     return g
-
-
