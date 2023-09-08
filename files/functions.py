@@ -1,6 +1,7 @@
 import os
 import yaml
 import json
+import time
 from itertools import chain
 from typing import Optional
 
@@ -42,3 +43,26 @@ def read_yaml(path):
 def read_json(path, encoding='utf-8'):
     with open(path, 'r', encoding=encoding) as f:
         return json.loads(f.read())
+
+
+def timed_filename(prefix=None, suffix=None, extension=None, timeformat=None):
+    """
+    creates file name with a time-stamp
+    the time-stamp format can be declared as per time library protocol
+    if not declared the default format is : %Y%m%dT%H%M'
+
+    :param prefix: str
+    :param suffix: str
+    :param extension: str
+    :param timeformat: as per time library protocol
+    :return: str
+    """
+
+    prefix = prefix or ''
+    suffix =suffix or ''
+    extension = extension or ''
+    if extension:
+        extension = '.' + extension
+    timeformat = timeformat or '%Y%m%dT%H%M'
+    t = time.strftime(timeformat,time.localtime())
+    return ''.join((prefix, t, suffix, extension))

@@ -1,5 +1,9 @@
 """
 Decay is an abstract parameter that with each retrieval (Decay.value) decays towards asymptote.
+
+Decay uses a hyperbola decay (l/(x + k) where l and k are hyperparameters.
+In the next version it will use l * exp(x * k) + asymptote
+
 """
 
 import numpy as np
@@ -151,7 +155,7 @@ class Adapter:
     def step(self):
         return len(self.fails) - self.N_WARM_UP
 
-    def adjust(self):
+    def adjust(self, nudge):
         """
         calculates next nudge and next asymptote values
         from the probbability of fail values
@@ -169,14 +173,16 @@ class Adapter:
 
         if self.step < 0:
             next_asymptote = self.decay.asymptote
-            next_nudge = self.decay.start
+            next_nudge = nudge or self.decay.start
         else:
             next_nudge = mean_fails + \
                          (direction * self.nudge_rate.value(self.step) * std_fails) + \
                          (direction * last_ones * 0.5 * std_fails)  # surplus for multiple single attempt fails
+            next_nudge = nudge or next_nudge
             next_asymptote = mean_fails + (direction * self.STD_ASYMPTOTE * std_fails)
 
-        if next_nudge == next_asymptote:
+        if next_nudge == next_asymptote or (next_nudge - next_asymptote) * direction < 0:
+            # in case of misscalculation this overrides the calculations
             all_interval = self.decay.start, self.decay.init_asymptote, *self.fails
             mean_all_interval = np.mean(all_interval)
             std_all_interval = np.std(all_interval)
@@ -199,7 +205,6 @@ class Adapter:
                     (direction * last_ones * 0.5 * std_all_interval)
                 )  # surplus for multiple single attempt fails
 
-
         self.next_nudge = next_nudge
         self.next_asymptote = next_asymptote
         print(
@@ -212,7 +217,7 @@ class Adapter:
         # rate curve needs no adjustment as the only parameter defining it is self.N_DECAY
         # because it always tends to 1 (100% of the previous rate
 
-    def adapt(self):
+    def adapt(self, nudge=None):
         """
         this is called by Decay if conditions are met
         """
@@ -220,7 +225,7 @@ class Adapter:
             raise RuntimeError(f'adaptation has been called before warm-up has completed')
         self.decay.ticker.flush()
         self.fails.append(self.decay.previous)
-        self.adjust()
+        self.adjust(nudge)
 
         # adjusting asymptote
         self.decay.curve.v = self.next_asymptote
@@ -282,10 +287,9 @@ class Decay:
         """
     UNHOOK = 1000  # number of steps neede to onhook the asymptote
 
-    def __init__(self, start, asymptote=0, rate=0.5, nudge=1, adapt=True):
+    def __init__(self, start, asymptote=0, rate=0.5, adapt=True):
         self.start = start
         self.adapt = adapt
-        self.nudge_by = nudge or 0
         self._step = 0
         self._nudged = False
         self.ticker = Ticker()
@@ -378,12 +382,12 @@ class Decay:
             coor = coor[1]
         return coor
 
-    def nudge(self):
+    def nudge(self, val=None):
         if self.adapt and self.adapter.step >= 0:
-            self.adapter.adapt()
+            self.adapter.adapt(val)
         else:
-            required_y = self.previous + (self.c * abs(self.previous - self.curve.v))
-            return self.nudge_to_value(required_y)
+            val = val or self.previous + (self.c * abs(self.previous - self.curve.v))
+            return self.nudge_to_value(val)
 
     def nudge_by_percent(self, percent):
         """
