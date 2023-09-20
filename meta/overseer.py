@@ -387,7 +387,7 @@ def oversee(*args, **kwargs):
      @oversee({'a':{'before_call':True}, 'c':{'after_return':True, 'store_result':True})
      class MyClass:
         def a(): # will be overseen before the call
-        def b():
+        def b(): # will NOT be overseen
         def c(): # will be overseen after return, and the result will be stored
 
     :param args:

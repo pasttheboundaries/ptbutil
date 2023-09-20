@@ -35,6 +35,25 @@ def files_in_dir(directory_path: str, condition: Optional[callable] = None, r: b
     return relevant_files
 
 
+def nowfilename(prefix=None, suffix=None, extension=None, timeformat=None):
+    """
+    returns a name of a file with time signature
+    name format is [prefix][time-signature][suffix].[extension]
+    :param prefix: str
+    :param suffix: str
+    :param extension: str
+    :param timeformat: str (according to time.strftime protocol)
+    :return: str
+    """
+    prefix = prefix or ''
+    suffix = suffix or ''
+    extension = extension or ''
+    if extension:
+        extension = '.' + extension
+    timeformat = timeformat or '%Y%m%dT%H%M'
+    t = time.strftime(timeformat, time.localtime())
+    return ''.join((prefix, t, suffix, extension))
+
 def read_yaml(path):
     with open(path, 'r', encoding='utf-8') as f:
         return yaml.load(f.read(), Loader=yaml.Loader)
