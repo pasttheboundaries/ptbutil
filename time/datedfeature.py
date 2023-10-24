@@ -192,12 +192,21 @@ class DatedFeature:
         except ValueError:
             raise DatetimeParsingError(f'Could not parse date {dt}')
 
-    def _parse_string(self, dt):
+    def _parse_string(self, dt: str):
         """
         attempts to use pd.to_datetime and re-passes to _parse_value to return datetime.datetime
 
         if this fails tries _from_isoformat
         """
+
+        # TO BE IMPLEMENTED
+        # if re.match(r'\d{4}\D\d{2}\D\d{2}.*', dt):
+        #     yearfirst = True
+        # elif re.match(r'\d{2}\D\d{2}\D\d{4}.*', dt):
+        #     yearfirst = False
+        # else:
+        #     yearfirst = None
+
         try:
             return self._parse_value(
                 pd.to_datetime(
@@ -348,9 +357,9 @@ class DatedFeature:
 def closest(reference, others, look=0):
     reference = DatedFeature(reference).datetime
     others_dates = [DatedFeature(other).datetime for other in others]
-    closest = ClosestTimePoints(reference, others_dates, look=look).first
+    closest_tpoints = ClosestTimePoints(reference, others_dates, look=look).first
     for date, other in zip(others_dates, others):
-        if date == closest:
+        if date == closest_tpoints:
             return other
 
 
@@ -375,4 +384,3 @@ class TimeOrdered:
 
     def __iter__(self):
         return (it for it in self.features)
-

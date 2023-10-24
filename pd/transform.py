@@ -24,6 +24,44 @@ def apply_nan(data: Union[np.ndarray, pd.DataFrame], nan: Any):
     return data
 
 
+def drop_stray_rows(df: pd.DataFrame, drop_condition: callable, subset: Iterable = None, raise_ratio: float = 0.1):
+    """
+    Drops dataframe rows where condition applied to a cell value is True.
+
+    df: pd.DataFrame
+    condition: callable - must be a callable that returns bool type
+    subset: IterableIf subset is declared, the condition is checked against the subset columns only.
+    raise_ratio: float - decides if the resultant drop dataframe should raise a ValueError or return processed DataFrame
+
+    :return: pd.DataFrame
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError(f'Expected pandas.DataFrame. Got {type(df)}')
+    if len(df) < 1:
+        return df
+
+    if subset:
+        if any(ss not in df.columns for ss in subset):
+            raise ValueError(f'subset argument must be an iterable of df columns names')
+        sdf = df[list(subset)]
+    else:
+        sdf = df
+
+    if not isinstance(drop_condition(sdf.iat[0, 0]), bool):
+        raise ValueError(f'drop_condition argument  must be a callable that returns bool type always.')
+
+    bforedrop_len = df.shape[0]
+    try:
+        df = df[sdf[sdf.applymap(drop_condition)].isna().all(axis=1)]
+    except TypeError as e:
+        raise TypeError(f'drop_condition callable is not suitable for the data.') from e
+    afterdrop_len = df.shape[0]
+    if (bforedrop_len - afterdrop_len) / bforedrop_len > raise_ratio:
+        raise ValueError(
+            f'Too many stray rows in \n{df.head(5)}\n.\n.\n.\nshape={df.shape}\nAcceptable ratio is set to {raise_ratio}, but found more.')
+    return df
+
+
 def drop_valaues(df, value, axis=0):
     """
     Drops rows (if axis is set to 0) or columns (axis set to 1) containing indicated value
