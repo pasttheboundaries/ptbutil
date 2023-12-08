@@ -1,5 +1,5 @@
 from typing import Any, Type, Iterable
-from ptbutil.errors.basic import ValidationError
+from ptbutil.errors import ValidationError
 import pandas as pd
 import numpy as np
 

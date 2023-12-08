@@ -1,6 +1,6 @@
 from .types import validate_type
-from collections import Collection
-from ptbutil.errors.basic import ValidationError, ContainmentError
+from collections.abc import Collection
+from ptbutil.errors import ValidationError, ContainmentError
 
 
 

@@ -8,7 +8,7 @@ from typing import Union, Any
 
 def apply_nan(data: Union[np.ndarray, pd.DataFrame], nan: Any):
     """
-    Changes declared value into numpy.nan in pandas.DataFrame od numpy.ndarray
+    Changes declared value into numpy.nan in pandas.DataFrame or a numpy.ndarray
 
     :param data: numpy.ndarray | pandas.DataFrame
     :param nan: any value to be changed into numpy.nan in data

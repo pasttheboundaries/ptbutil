@@ -19,7 +19,7 @@ def test_debug_module():
     for _ in range(100):
         pooled_list = [func() for func in debug.FuncPooler.random_pool(3)]
         pooled = ''.join(pooled_list)
-        assert  pooled in ('aaa','aab','aac',
+        assert pooled in ('aaa','aab','aac',
                            'aba','abb','abc',
                            'aca','acb','acc',
                            'baa','bab','bac',

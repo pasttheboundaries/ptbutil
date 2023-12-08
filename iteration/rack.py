@@ -41,7 +41,7 @@ class BinaryMultiindex:
     bi.index(3) # = 2
 
 
-    disadvantages
+    disadvantages:
     """
 
     def __init__(self, value=0):

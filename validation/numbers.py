@@ -1,6 +1,6 @@
 import math
 from typing import Union, Type, Optional
-from ptbutil.errors.basic import ValidationError
+from ptbutil.errors import ValidationError
 from .types import validate_type
 
 

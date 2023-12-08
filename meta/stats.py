@@ -198,7 +198,7 @@ class Stat(ABC):
         like:
         self.overseer.oversee(self.var, before_call=self.increment, register=False)
 
-        in the case above method increment is a auxiliary method to change the state of the owner stats registry
+        in the case above method increment is an auxiliary method to change the state of the owner stats registry
 
     """
     def __init__(self, stats: Stats, var: object):

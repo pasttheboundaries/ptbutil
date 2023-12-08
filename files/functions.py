@@ -1,9 +1,10 @@
-import os
-import yaml
 import json
-import time
+import os
 from itertools import chain
 from typing import Optional
+
+import time
+import yaml
 
 
 def files_in_dir(directory_path: str, condition: Optional[callable] = None, r: bool = False) -> list:
@@ -35,7 +36,8 @@ def files_in_dir(directory_path: str, condition: Optional[callable] = None, r: b
     return relevant_files
 
 
-def nowfilename(prefix=None, suffix=None, extension=None, timeformat=None):
+
+def nowfilename(prefix=None, suffix=None, extension=None, timeformat=None, cputime=False):
     """
     returns a name of a file with time signature
     name format is [prefix][time-signature][suffix].[extension]
@@ -43,6 +45,7 @@ def nowfilename(prefix=None, suffix=None, extension=None, timeformat=None):
     :param suffix: str
     :param extension: str
     :param timeformat: str (according to time.strftime protocol)
+    :param cputime: bool - if True uses cpu time instead of formatted time
     :return: str
     """
     prefix = prefix or ''
@@ -51,7 +54,7 @@ def nowfilename(prefix=None, suffix=None, extension=None, timeformat=None):
     if extension:
         extension = '.' + extension
     timeformat = timeformat or '%Y%m%dT%H%M'
-    t = time.strftime(timeformat, time.localtime())
+    t = (not cputime) and time.strftime(timeformat, time.localtime() or str(time.process_time())).replace('.', '')
     return ''.join((prefix, t, suffix, extension))
 
 def read_yaml(path):

@@ -3,4 +3,4 @@
 package errors provides various errors
 """
 
-from .basic import ValidationError, ContainmentError, ParsingError, DecorationError, DoesNotBelong
+from .errors import ValidationError, ContainmentError, ParsingError, DecorationError, DoesNotBelong
