@@ -44,6 +44,7 @@ def validate_2d_array(it: Iterable):
         print('PANDAS')
         return it.values
     else:
+        print('ELSE')
         try:
             return np.array(it)
         except Exception as e:

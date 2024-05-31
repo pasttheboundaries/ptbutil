@@ -18,6 +18,9 @@ def apply_nan(data: Union[np.ndarray, pd.DataFrame], nan: Any):
 
 
 def _fix_types_in_DF(df):
+
+    """ zamienia typy str i object na bool"""
+
     for column in df.columns:
         if df[column].dtype in (object, str):
             df[column] = df[column].apply(bool).apply(int)
@@ -28,6 +31,22 @@ def _fix_array_dtype(array):
     if array.dtype == object:
         array = (array == True).astype(int)
     return array
+
+
+def _bool_array(data, nans: set, columns):
+
+    if isinstance(data, np.ndarray):
+        if data.ndim != 2:
+            raise ValueError(f'Could not process {data.ndim}-dim array')
+        columns = columns or list(range(data.shape[1]))
+    elif isinstance(data, pd.DataFrame):
+        columns = columns or data.columns
+
+    plate = np.ones(data.shape, dtype=np.int8)
+    for nan in nans:
+        plate[data == nan] = 0
+
+    return plate, columns
 
 
 def missing_data_plate(data: Union[np.ndarray, pd.DataFrame], title=None, dpi=200, figsize=(4, 4), columns=None,
@@ -41,43 +60,21 @@ def missing_data_plate(data: Union[np.ndarray, pd.DataFrame], title=None, dpi=20
     :param columns: iterable of column names. If left None , ordinal numbers will be applied as in numpy.ndarray;
     :return: matplotlib.pyplot.Figure
     """
-
-
-    # sorting types
-    if isinstance(data, pd.DataFrame):
-        data = _fix_types_in_DF(data)
-    elif isinstance(data, np.ndarray):
-        data = _fix_array_dtype(data)
-    else:
-        raise TypeError('Can only construct missing data plate for numpy.ndarray or pandas.DataFrame.')
-
-    if isinstance(data, pd.DataFrame):
-        columns = columns or data.columns
-    else:
-        columns = columns or list(range(data.shape[1]))
-
-        data = validate_2d_array(data)
-        data = pd.DataFrame(data)
-
-    # changes declared nan values into np.nan, so it subsequently can be cut out by isna()
     if nans is AbsentData:
-        nans = ('', None, np.nan)
-
+        nans = {'', None, np.nan}
     if isinstance(nans, (tuple, list, set)):
-        for nan in nans:
-            data = apply_nan(data, nan)
+        nans = set(nans)
     else:
-        data = apply_nan(data, nans)
+        nans = {nans}
 
-    data = ~data.isna()
-    data = data.values.astype(int)
+    data, columns = _bool_array(data, nans, columns)
 
     percentages = np.round((1 - (np.sum(data, axis=0) / data.shape[0])), 3)
 
     # this guarantees all ones will come out as black picture and avoids normalization
     # this must be done after percentages calculation
-    if np.all(data == 1):
-        data[0, 0] = 0.99991
+    # if np.all(data == 1):
+    #     data[0, 0] = 0.99991
 
     fig, axes = plt.subplots(dpi=dpi)
     fig.set_size_inches(figsize)

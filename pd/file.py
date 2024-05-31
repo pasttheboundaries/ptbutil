@@ -41,24 +41,24 @@ def _read_df_by_ex(extension, filepath, encoding='utf-8', sep=','):
         raise ValueError(f'Could not read file with extension {extension}')
 
 
-def read_dir_files(directory=None, nameroot=None, extention=None, encoding='utf-8', sep=','):
+def read_dir_files(directory=None, nameroot=None, extension=None, encoding='utf-8', sep=','):
     """
     Supports opening files with extensions
     :param directory: str, if None files will be read from current working directory
     :param nameroot: str - part of the filename that will qualify file to be read
-    :param extention: str - extention of files to be read.
+    :param extension: str - extention of files to be read.
     :return: a tuple of (list of pd.DataFrames, list of files paths)
     """
-    if extention and extention not in VALID_EXTENTIONS:
-        raise ValueError(f'Invalid extention {extention}')
+    if extension and extension not in VALID_EXTENTIONS:
+        raise ValueError(f'Invalid extension {extension}')
     directory = directory or os.getcwd()
-    if any((nameroot, extention)):
-        files = _find_user_indicated_files(directory, nameroot, extention)
+    if any((nameroot, extension)):
+        files = _find_user_indicated_files(directory, nameroot, extension)
         extensions = set([f.split('.')[-1] for f in files])
         if len(extensions) > 1:
-            raise Exception('Detected multiple file extensions. Please specify 1 valid file extention or name root.')
+            raise Exception('Detected multiple file extensions. Please specify 1 valid file extension or name root.')
         elif len(extensions) < 1:
-            raise FileNotFoundError('No valid file extention found.')
+            raise FileNotFoundError('No valid file extension found.')
         else:
             ex = extensions.pop()  # detected files valid
     else:
@@ -66,7 +66,7 @@ def read_dir_files(directory=None, nameroot=None, extention=None, encoding='utf-
         extention_in_dir = _detect_extentions_in_dir(directory)
         accepted_extensions = [ex for ex in extention_in_dir if ex in VALID_EXTENTIONS]
         if len(accepted_extensions) > 1:
-            raise Exception('Detected multiple files with valid extensions. Please specify file extention or name root.')
+            raise Exception('Detected multiple files with valid extensions. Please specify file extension or name root.')
         elif len(accepted_extensions) < 1:
             raise FileNotFoundError('No valid files found in current working directory.')
         else:

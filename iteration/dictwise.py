@@ -2,7 +2,7 @@ import string
 import logging
 
 
-class dicta(dict):
+class Dicta(dict):
     """this is a dictionary with getattr and setattr methods implemented"""
 
     INVALID_PUNCTUATION = ''.join([char for char in string.punctuation if char != '_'])
@@ -10,10 +10,10 @@ class dicta(dict):
     def __init__(self, __d__=None, **kwargs):
         """can not accept key_word argument with __d__ key."""
         if __d__:
-            if isinstance(__d__, (dict, dicta)):
+            if isinstance(__d__, (dict, Dicta)):
                 self.update(__d__)
             else:
-                raise TypeError('Passed object must by type dict or dicta.')
+                raise TypeError('Passed object must by type dict or Dicta.')
 
         if kwargs:
             self.update(kwargs)
@@ -27,8 +27,8 @@ class dicta(dict):
 
 
     def update(self, __d__):
-        if not isinstance (__d__, (dict, dicta)):
-            raise TypeError('Can update dicta only with dict or dicta.')
+        if not isinstance (__d__, (dict, Dicta)):
+            raise TypeError('Can update Dicta only with dict or Dicta.')
         for k, v in __d__.items():
             self._validate_key(k)
             super().update({k: v})
@@ -48,6 +48,9 @@ class dicta(dict):
     def __setattr__(self, key, value):
         self._validate_key(key)
         self[key] = value
+
+
+dicta = Dicta  # alias for p[ast projects
 
 
 def sort_by_value(dictionary: dict) -> dict:

@@ -3,6 +3,7 @@ import yaml
 from typing import Dict, Any
 from ptbutil.iteration.dictwise import merge_2_dicts
 
+
 class Config(object):
     def __init__(self, name=None):
         self._config_own_name = name or 'Config'
