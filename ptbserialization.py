@@ -13,24 +13,36 @@ ATTRS_ANNOTATION_KEY = 'ATTRS__'
 class PtbSerializable(ABC):
     """
     This is an abstract class but should not be used for subclassing in the traditional manner.
-    Istead the PtbSerializable.register decorator should be used upon a subclass definition
-    This will achieve 2 goals:
-    1) add PtbSerializable to decorated class __bases__ and force joining required methods to the subclass,
-    just as in normal subclassing.
-    Required methods are:
-    - serialization_init_params(self)
-    - serialization_instance_attrs(self)
 
-    for the methods details see methods __doc__strings
+    It has two modes of peration:
 
-    2) will register the class with PtbSerializable.SERIALIZABLE_REGISTER,
-    which is necessary for the encoding and decoding
-    while serialization and instantiation of custom classes by
-    hisrobot.exchange.serialize (and deserialize) functions, using json library.
+    A. DECORATING (registering) USER CLASSES
+        @PtbSerializable.register decorator should be used upon a subclass definition
+        This will achieve 2 goals:
+        1) add PtbSerializable to decorated class __bases__ and force joining required methods to the subclass,
+        just as in normal subclassing.
+        Required methods are:
+        - serialization_init_params(self)
+        - serialization_instance_attrs(self)
 
+        for the methods details see methods __doc__strings
+
+        2) will register the class with PtbSerializable.SERIALIZABLE_REGISTRY,
+        which is necessary for the encoding and decoding
+        while serialization and instantiation of custom classes by
+        hisrobot.exchange.serialize (and deserialize) functions, using json library.
+
+
+    B. Registering foreign types:
+        Any type cane be registered as a foreign serializable type
+        This is performed by calling  PtbSerializable.register_foreign with the type.
+        For example:
+        PtbSerializable.register_foreign(datetime, serializable_init_params=lambda x: {'*': x.timetuple()[:6]})
+        registers datetime.datetime type and defines the serializable_init_params function
     """
-    SERIALIZABLE_REGISTER = dict()
-    FOREIGN_SERIALIZABLE_REGISTER = dict()
+
+    SERIALIZABLE_REGISTRY = dict()
+    FOREIGN_SERIALIZABLE_REGISTRY = dict()
 
     @classmethod
     def register(cls, subclass):
@@ -42,7 +54,7 @@ class PtbSerializable(ABC):
         """
         bases = tuple([b for b in subclass.__bases__ if b is not object] + [cls])
         new_type = type(subclass.__name__, bases, dict(subclass.__dict__))
-        PtbSerializable.SERIALIZABLE_REGISTER[subclass.__name__] = new_type
+        PtbSerializable.SERIALIZABLE_REGISTRY[subclass.__name__] = new_type
         return new_type
 
     @classmethod
@@ -74,7 +86,7 @@ class PtbSerializable(ABC):
         if serialization_instance_attrs and not callable(serialization_instance_attrs):
             raise TypeError(f'serializable_init_params must be callable. See __doc__.')
 
-        PtbSerializable.FOREIGN_SERIALIZABLE_REGISTER.update(
+        PtbSerializable.FOREIGN_SERIALIZABLE_REGISTRY.update(
             {
                 type_.__name__: {TYPE_ANNOTATION_KEY: type_,
                                  INIT_ANNOTATION_KEY: serializable_init_params,
@@ -132,7 +144,7 @@ def ptbs_preprocess(obj):
         return {TYPE_ANNOTATION_KEY: obj.__class__.__name__,
                 INIT_ANNOTATION_KEY: ptbs_preprocess(obj.serialization_init_params()),
                 ATTRS_ANNOTATION_KEY: ptbs_preprocess(obj.serialization_instance_attrs())}
-    elif PtbSerializable.FOREIGN_SERIALIZABLE_REGISTER.get(type(obj).__name__):
+    elif PtbSerializable.FOREIGN_SERIALIZABLE_REGISTRY.get(type(obj).__name__):
         return preprocess_foreign(obj)
     elif isinstance(obj, Mapping):
         return {k: ptbs_preprocess(v) for k, v in obj.items()}
@@ -143,7 +155,7 @@ def ptbs_preprocess(obj):
 
 
 def preprocess_foreign(obj) -> dict:
-    registered = PtbSerializable.FOREIGN_SERIALIZABLE_REGISTER[type(obj).__name__]
+    registered = PtbSerializable.FOREIGN_SERIALIZABLE_REGISTRY[type(obj).__name__]
 
     if init_factory := registered.get(INIT_ANNOTATION_KEY):
         inits = init_factory(obj)
@@ -224,9 +236,9 @@ class PtbSerialisationDecoder(json.JSONDecoder):
 
     @staticmethod
     def get_factory(obj: Mapping):
-        factory = PtbSerializable.SERIALIZABLE_REGISTER.get(obj[TYPE_ANNOTATION_KEY], None)
+        factory = PtbSerializable.SERIALIZABLE_REGISTRY.get(obj[TYPE_ANNOTATION_KEY], None)
         if not factory:
-            registerd = PtbSerializable.FOREIGN_SERIALIZABLE_REGISTER.get(obj[TYPE_ANNOTATION_KEY], None)
+            registerd = PtbSerializable.FOREIGN_SERIALIZABLE_REGISTRY.get(obj[TYPE_ANNOTATION_KEY], None)
             if not registerd:
                 factory = None
             else:

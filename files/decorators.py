@@ -10,22 +10,22 @@ class RTWProtocolError(Exception):
 def RTW(sources: list, destination_dir, n_lines=1):
     """
     RTW [read-transform-write] decorator will use the decorated function
-        as a transformator function for lines read from a source file.
+        as a transformator function for lines read from a source data.
     The decorated function must be designed so:
-     -it accepts a single argument - a text line [read from an open file iterator],
-     -it returns a single line ended with a '\n' sign [to be saved in a destination file]
+     -it accepts a single argument - a text line [read from an open data iterator],
+     -it returns a single line ended with a '\n' sign [to be saved in a destination data]
     RTW returns a wrapper that will not accept any argument. Once it is called (without any argument) it will:
-    - start separate threading.Thread for every source file:
-    - start reading lines from the source file , transforming and saving them to the destination file.
+    - start separate threading.Thread for every source data:
+    - start reading lines from the source data , transforming and saving them to the destination data.
     - will return working processes in a list [so the threading.Thread.join method can be used later]
-    Reading and writing is lazy - so it will not impinge memory unless to many files are attempted to be opened.
-    The destination files will have the same name as the source files - but will be placed in the destination directory.
+    Reading and writing is lazy - so it will not impinge memory unless to many existing_files are attempted to be opened.
+    The destination existing_files will have the same name as the source existing_files - but will be placed in the destination directory.
 
     RTW arguments:
-    - sources: list - a list of absolute paths to source files
-    - destination_dir - a directory for the destination files to be saved in
-    - n_lines: int =- a number of lines to be read and transformed as a batch before writing to a file.
-    (Writing to a file is time expensive, so it pays to write once in a while in batches BUT
+    - sources: list - a list of absolute paths to source existing_files
+    - destination_dir - a directory for the destination existing_files to be saved in
+    - n_lines: int =- a number of lines to be read and transformed as a batch before writing to a data.
+    (Writing to a data is time expensive, so it pays to write once in a while in batches BUT
     reading many lines at the same time is memory consuming - best performance setting must be done by trials)
 
     WARNING:
@@ -42,7 +42,7 @@ def RTW(sources: list, destination_dir, n_lines=1):
                 while not exit_flag:
                     nli = 0
                     lines = list()
-                    # loop reads lines from a source file
+                    # loop reads lines from a source data
                     while nli < nl:
                         try:
                             lines.append(next(sfile))

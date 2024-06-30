@@ -126,8 +126,8 @@ class StringTree:
     - record (key: str, value: any type): records a word into the dictionary
     splitting it letter by letter as the keys of the nested dictionary.
     - read (key: str): retrieves a value from the dictionary.
-    - from_pickle(path: str): loads a dictionary from pickled file.
-    - to_pickle(path: str): saves the dictionary into a pickle file.
+    - from_pickle(path: str): loads a dictionary from pickled data.
+    - to_pickle(path: str): saves the dictionary into a pickle data.
     """
     def __init__(self, target_key='00', count_on_load=False):
         self.tree = dict()
@@ -215,7 +215,7 @@ class StringTree:
     def from_pickle(self, path):
         self.tree = pickle.load(open(path, 'rb'))
         if not type(self.tree) == dict:
-            raise NotImplementedError('Wrong data loaded from file. Expected pickled dictionary.')
+            raise NotImplementedError('Wrong data loaded from data. Expected pickled dictionary.')
         self.count_leaves()
         return self
 
@@ -224,7 +224,7 @@ class StringTree:
             read = f.read()
         self.tree = json.loads(read)
         if not type(self.tree) == dict:
-            raise NotImplementedError('Wrong data loaded from file. Expected jsonified dictionary.')
+            raise NotImplementedError('Wrong data loaded from data. Expected jsonified dictionary.')
         self.count_leaves()
         return self
 

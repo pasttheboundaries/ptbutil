@@ -50,7 +50,7 @@ class Reaper:
 
     def write(self, obj):
         """
-        writes list of dicts into the file
+        writes list of dicts into the data
         :param obj:
         :return:
         """
@@ -61,7 +61,7 @@ class Reaper:
 
     def append(self, obj: dict):
         """
-        appends object to the file
+        appends object to the data
         :param obj:  dict
         :return: None
         """
@@ -76,7 +76,7 @@ class Reaper:
     def collect(self, obj):
         """
         appends object to self.collection
-        if collection is longer than dump_at: dumps collection t=into the file
+        if collection is longer than dump_at: dumps collection t=into the data
         :param obj:
         :return: None
         """

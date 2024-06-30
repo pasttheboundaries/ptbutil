@@ -4,7 +4,7 @@
     env - for environment management
     exception - custom exceptions
     generation - random data generators
-    files - in/out facilitation
+    existing_files - in/out facilitation
     iteration - iteration or iterable support
     meta - meta programming support
     pd - pandas functionality support

@@ -4,7 +4,7 @@ import pandas as pd
 from ptbutil.env import available_sitepackages
 
 """
-functions that read csv, xls, xlsx files
+functions that read csv, xls, xlsx existing_files
 """
 VALID_EXTENTIONS = 'xls xlsx csv ods'.split()
 
@@ -38,16 +38,16 @@ def _read_df_by_ex(extension, filepath, encoding='utf-8', sep=','):
             with open(filepath, mode="rb") as excel_file:
                 return pd.read_excel(excel_file)
     else:
-        raise ValueError(f'Could not read file with extension {extension}')
+        raise ValueError(f'Could not read data with extension {extension}')
 
 
 def read_dir_files(directory=None, nameroot=None, extension=None, encoding='utf-8', sep=','):
     """
-    Supports opening files with extensions
-    :param directory: str, if None files will be read from current working directory
-    :param nameroot: str - part of the filename that will qualify file to be read
-    :param extension: str - extention of files to be read.
-    :return: a tuple of (list of pd.DataFrames, list of files paths)
+    Supports opening existing_files with extensions
+    :param directory: str, if None existing_files will be read from current working directory
+    :param nameroot: str - part of the filename that will qualify data to be read
+    :param extension: str - extention of existing_files to be read.
+    :return: a tuple of (list of pd.DataFrames, list of existing_files paths)
     """
     if extension and extension not in VALID_EXTENTIONS:
         raise ValueError(f'Invalid extension {extension}')
@@ -56,19 +56,19 @@ def read_dir_files(directory=None, nameroot=None, extension=None, encoding='utf-
         files = _find_user_indicated_files(directory, nameroot, extension)
         extensions = set([f.split('.')[-1] for f in files])
         if len(extensions) > 1:
-            raise Exception('Detected multiple file extensions. Please specify 1 valid file extension or name root.')
+            raise Exception('Detected multiple data extensions. Please specify 1 valid data extension or name root.')
         elif len(extensions) < 1:
-            raise FileNotFoundError('No valid file extension found.')
+            raise FileNotFoundError('No valid data extension found.')
         else:
-            ex = extensions.pop()  # detected files valid
+            ex = extensions.pop()  # detected existing_files valid
     else:
         #directory = config.TARGET_DIR
         extention_in_dir = _detect_extentions_in_dir(directory)
         accepted_extensions = [ex for ex in extention_in_dir if ex in VALID_EXTENTIONS]
         if len(accepted_extensions) > 1:
-            raise Exception('Detected multiple files with valid extensions. Please specify file extension or name root.')
+            raise Exception('Detected multiple existing_files with valid extensions. Please specify data extension or name root.')
         elif len(accepted_extensions) < 1:
-            raise FileNotFoundError('No valid files found in current working directory.')
+            raise FileNotFoundError('No valid existing_files found in current working directory.')
         else:
             ex = accepted_extensions.pop()
             files = [os.path.join(directory, f) for f in os.listdir(directory) if f.endswith(ex)]

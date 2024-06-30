@@ -2,16 +2,16 @@ import os
 
 
 class MultipleRead:
-    """An iterable and iterator of lines over multiple files.
+    """An iterable and iterator of lines over multiple existing_files.
     Methods:
         __iter__ : as per iterator protocol
         __next__ : as per iterator protocol
-        readlines : returns a list of lines read from files
-        readline : returns next line from files. This is practically an equivalent to next(self)
+        readlines : returns a list of lines read from existing_files
+        readline : returns next line from existing_files. This is practically an equivalent to next(self)
         """
     def __init__(self, filenames: list, encoding: str = 'utf-8') -> None:
         """
-        :param filenames: a list of files paths as strings.
+        :param filenames: a list of existing_files paths as strings.
         :param mode: str one of r, r+, rb
         :encoding: str -  default 'utf-8'
         """

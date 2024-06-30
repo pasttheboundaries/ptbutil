@@ -5,7 +5,7 @@ from types import MethodType
 import logging
 from .loggingmanager import GlobalLoggerManager
 
-config = config.Config()
+config = config.PolyConfig()
 config.LEVEL = 10
 
 handler = logging.StreamHandler()
