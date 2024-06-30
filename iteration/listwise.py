@@ -9,8 +9,16 @@ from math import ceil, floor
 
 def chaintype(t: type, *iterators: Iterable):
     """
-    works as itertools.chain but does not apply iteration over elements of sertain types
-    :return: mapping
+    works as itertools.chain but does not apply iteration over elements of certain types
+    :return:
+
+    this can be usefull when concatenation of varius iterable types happens:
+    eg:
+    tuple(chain(  'koń', [1,2,3], [2,3,4]))
+    ('k', 'o', 'ń', 1, 2, 3, 2, 3, 4)
+
+    tuple(chaintype(str,  'koń', [1,2,3], [2,3,4]))
+    ('koń', 1, 2, 3, 2, 3, 4)
     """
     return chain(*map(lambda x: (x,) if isinstance(x, t) else x, iterators))
 

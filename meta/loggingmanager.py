@@ -1,3 +1,9 @@
+"""
+This module misses the point
+It is counteradvised to use it
+"""
+
+
 import logging
 
 

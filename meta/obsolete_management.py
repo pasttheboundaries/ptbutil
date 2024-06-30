@@ -1,4 +1,4 @@
-from .metaloggers import MetaLogger
+import logging
 from functools import wraps, partial
 
 obsolete_error_message_1 = "Invalid use of obsolete decorator. \
@@ -16,26 +16,51 @@ def obsolete(arg):
         - in this case only default wessage will show.
     """
     if callable(arg):
-        return obsolete_decorator(arg)
+        return _obsolete_decorator(arg)
     elif isinstance(arg, str):
-        return partial(obsolete_decorator, message_appendix=arg)
+        return partial(_obsolete_decorator, message_appendix=arg)
     else:
         raise ValueError(obsolete_error_message_1)
 
 
-def obsolete_decorator(fn, message_appendix=None):
+def _obsolete_decorator(fn, message_appendix=None):
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(message)s')
+    handler.setFormatter(formatter)
+    logger = logging.getLogger('indentation_debug_logger')
+    logger.addHandler(handler)
 
-    calls = 0
-    logger = MetaLogger.logger
-    message = f'Function {fn.__name__} is obsolete. It might be deactivated in the near future '
+    called = False
+    message = f'Function {fn.__name__} is obsolete. It might be deactivated in the near future. '
     if message_appendix:
         message = message + str(message_appendix)
+
     @wraps(fn)
     def wrapper(*args, **kwargs):
         nonlocal calls
-        if calls == 0:
+        if called:
             logger.warning(message)
-            calls = 1
+            called = True
         return fn(*args, **kwargs)
 
+    return wrapper
+
+
+def deprecated(fn):
+    """
+    a decorator to mark deprecated functions.
+    A deprecated unction when called will issue warning when called.
+    If it is called multiple times it will issue warining only once.
+    """
+    called = False
+
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        nonlocal called
+        if not called:
+            logging.warning(f'Function {fn.__name__, repr(fn)} is deprecated. '
+                            f'It is not serviced and might trigger errors or false results.')
+        result = fn(*args, **kwargs)
+        called = True
+        return result
     return wrapper

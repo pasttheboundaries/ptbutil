@@ -7,7 +7,7 @@ Usage:
 store_path = '~/data/qstore'
 qs = QuickStore(store_path)
 qs['my_key'].add(value).dump()
-this will add the value to the stored collection AND remove duplicates in the collection (set behaviour)
+this will add the value to the stored 'my_key' collection  (set in this case) AND remove duplicates in the collection (set behaviour)
 
 In general QuickStore.__getitem__ will return a CollectionProxy.
 qs['my_key'] -> <CollectionProxy value=[1,2,3...]>
@@ -56,9 +56,8 @@ qs.dump()
 
 
 from typing import Mapping, Union
-import json
+import json, atexit, pathlib
 from threading import Lock
-import pathlib
 
 
 
@@ -172,12 +171,13 @@ def get_absolute_path(p: Union[str, pathlib.Path]):
 class QuickStore:
 
     """
-    StoreHolder descriptor gurantees always the most recent version of store is retrieved
+    QuickStore class
     """
 
     def __init__(self, file_path: str):
         self.filepath = get_absolute_path(file_path)
         self.store: dict = init_quick_store(file_path)
+        atexit.register(self.dump)
 
     def __getitem__(self, item):
         return CollectionProxy(self, self.store, item)
@@ -189,6 +189,9 @@ class QuickStore:
             value = list(set)
         with update_lock:
             return self.store.update({key: value})
+
+    def __del__(self):
+        return self.dump()
 
     def as_dict(self):
         return self.store

@@ -12,13 +12,19 @@ def mac(hex=True):
         return uuid.getnode()
 
 
-def memory(g=True):
-    mem_bytes = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')  # e.g. 4015976448
-    mem_gib = mem_bytes / (1024. ** 3)
-    if g:
-        return mem_gib
-    else:
-        return mem_bytes
+def memory(g=True, raise_nt=False):
+    try:
+        mem_bytes = os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')  # e.g. 4015976448
+        mem_gib = mem_bytes / (1024. ** 3)
+        if g:
+            return mem_gib
+        else:
+            return mem_bytes
+    except AttributeError:
+        if raise_nt:
+            raise NotImplemented('Memory readout is not implemented outside Unix systems.')
+        else:
+            return None
 
 
 def procesor():
@@ -51,7 +57,7 @@ class Machine:
     system: str = field(default=platform.system(), init=False, repr=True)
     machine: str = field(default=platform.machine(), init=False, repr=True)
     mac: str = field(default=mac(), init=False, repr=True)
-    memory: str = field(default=memory(g=True), init=False, repr=True)
+    memory: str = field(default=memory(g=True, raise_nt=False), init=False, repr=True)
 
     def to_dict(self):
         return asdict(self)

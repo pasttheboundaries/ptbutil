@@ -4,7 +4,7 @@ import time
 from ptbutil.errors import DecorationError
 from functools import partial
 from ptbutil.func.decay import Decay
-from metalawareparam import MetalAwareParam
+from ptbutil.portable.metalawareparam import MetalAwareParam
 
 handler = logging.StreamHandler()
 formatter = logging.Formatter('%(message)s')
@@ -19,7 +19,7 @@ class PersistanceError(Exception):
     pass
 
 
-def persist_decorator(fn, _n):
+def _persist_decorator(fn, _n):
     @wraps(fn)
     def wrapper(*args, **kwargs):
 
@@ -49,10 +49,10 @@ def persist(arg):
     """
     if callable(arg):
         _n = 1
-        return persist_decorator(arg, _n)
+        return _persist_decorator(arg, _n)
     elif isinstance(arg, int):
         _n = arg
-        return partial(persist_decorator, _n=arg)
+        return partial(_persist_decorator, _n=arg)
     else:
         raise DecorationError from TypeError('persist can accept type int as parameter only')
 

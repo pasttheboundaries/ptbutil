@@ -27,7 +27,7 @@ class BinaryMultiindex:
     number 5 holds keys 0 and 2 (2**0 and 2**2) that will be indexed (0,1)
 
     usage:
-    bi = BinaryMultiindex(9)  binary encoded = 0b1001
+    bi = BinaryMultiindex(9)  # binary encoded = 0b1001
 
     bi.number(0) # = 0
     bi.number(1) # = 3
@@ -42,6 +42,8 @@ class BinaryMultiindex:
 
 
     disadvantages:
+    - difficult to wrap you head around.
+    - never seemd usefull, never used it
     """
 
     def __init__(self, value=0):

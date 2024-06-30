@@ -7,7 +7,7 @@ store_file_path = os.path.join(local_path, store_file_name)
 
 class Void:
     def __repr__(self):
-        return '<NOT SET>'
+        return '<Void>'
 
 void = Void()
 

@@ -49,15 +49,36 @@ def files_in_dir(directory_path: str, condition: Optional[callable] = None, r: b
     return filenames
 
 
-def nowfilename(prefix=None, suffix=None, extension=None, timeformat=None, cputime=False):
+class UniqueAdnex(object):
+    """
+    this is a helper object of a timestampped_filename function
+    """
+    def __init__(self):
+        self.pm = 0
+        self.t = None
+
+    def __call__(self, t):
+        if t == self.t:
+            self.pm += 1
+            return self.pm
+        else:
+            self.t = t
+            self.pm = 0
+            return self.pm
+
+formated_ua = UniqueAdnex()
+monotonic_ua = UniqueAdnex()
+
+
+def timestampped_filename(prefix=None, suffix=None, extension=None, timeformat=None, adnex_sep='p'):
     """
     returns a name of a data with time signature
     name format is [prefix][time-signature][suffix].[extension]
     :param prefix: str
     :param suffix: str
     :param extension: str
-    :param timeformat: str (according to time.strftime protocol)
-    :param cputime: bool - if True uses cpu time instead of formatted time
+    :param timeformat: str (according to time.strftime protocol) if None a time.monotonic will be used
+    :param adnex_sep: str - uniqe adnex separator
     :return: str
     """
     prefix = prefix or ''
@@ -65,13 +86,17 @@ def nowfilename(prefix=None, suffix=None, extension=None, timeformat=None, cputi
     extension = extension or ''
     if extension:
         extension = '.' + extension
-    timeformat = timeformat or '%Y%m%dT%H%M'
-    if cputime:
-        t = str(time.process_time()).replace('.', '')
-    else:
+    if timeformat:
         t = time.strftime(timeformat, time.localtime())
+        t = t + adnex_sep + str(formated_ua(t))
+    else:
+        t = str(time.monotonic_ns()).replace('.', '')
+        t = t + adnex_sep + str(monotonic_ua(t))
+
     return ''.join((prefix, t, suffix, extension))
 
+
+nowfilename = timestampped_filename  # alias
 
 def read_yaml(path):
     with open(path, 'r', encoding='utf-8') as f:
@@ -83,24 +108,3 @@ def read_json(path, encoding='utf-8'):
         return json.loads(f.read())
 
 
-def timed_filename(prefix=None, suffix=None, extension=None, timeformat=None):
-    """
-    creates data name with a time-stamp
-    the time-stamp format can be declared as per time library protocol
-    if not declared the default format is : %Y%m%dT%H%M'
-
-    :param prefix: str
-    :param suffix: str
-    :param extension: str
-    :param timeformat: as per time library protocol
-    :return: str
-    """
-
-    prefix = prefix or ''
-    suffix = suffix or ''
-    extension = extension or ''
-    if extension:
-        extension = '.' + extension
-    timeformat = timeformat or '%Y%m%dT%H%M'
-    t = time.strftime(timeformat,time.localtime())
-    return ''.join((prefix, t, suffix, extension))

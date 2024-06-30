@@ -1,4 +1,4 @@
-from .metaloggers import MetaLogger
+from .indentating_logger import MetaLogger
 from functools import wraps, partial
 
 
