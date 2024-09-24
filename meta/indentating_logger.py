@@ -54,7 +54,7 @@ hook activated when c returned
 
 IndentingLogger.config.LEVEL = 10
 IndentingLogger.config.COLOR = True
-IndentingLogger.config.LOG_PARAMS = True
+IndentingLogger.config.LOG_ARGS = True
 
 # on-of switch
 IndentingLogger.activate()
@@ -63,16 +63,13 @@ IndentingLogger.deactivate()
 """
 
 from functools import wraps, partial
-from sys import stdout
 from . import config
-from types import MethodType
 import logging
-from .loggingmanager import GlobalLoggerManager
 
 config = config.Config()
 config.LEVEL = 10
 config.COLOR = True
-config.LOG_PARAMS = True
+config.LOG_ARGS = True
 
 handler = logging.StreamHandler()
 formatter = logging.Formatter('%(message)s')
@@ -187,7 +184,7 @@ class IndentingLogger:
         def wrapper(*args, **kwargs):
             if cls._active:
                 call_message = f'Function {fn.__name__} called:'
-                if config.LOG_PARAMS:
+                if config.LOG_ARGS:
                     call_message +=  f' with params: {args, kwargs}'
                 local_indentation = "" # cls.deeper()
 
@@ -196,16 +193,18 @@ class IndentingLogger:
 
                 cls.log(level, call_message)
                 IndentingLogger.indentation_head.increase()
-            
+
+
+            #final_info = ' '.join((IndentationHead.OUT_ARROW, f'Function {fn.__name__} FAILED;'))
             try:
                 result = fn(*args, **kwargs)
                 final_info = ' '.join((IndentationHead.OUT_ARROW, f'Function {fn.__name__} returned;'))
             except Exception as e:
                 final_info = ' '.join((IndentationHead.OUT_ARROW, f'Function {fn.__name__} FAILED;'))
+                print('!')
                 raise e
             finally:
                 if cls._active:
-                    
                     #final_info = local_indentation + final_info + '\n'
                     final_info = final_info + '\n'
                     IndentingLogger.indentation_head.decrease()

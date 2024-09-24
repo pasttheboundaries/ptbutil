@@ -6,11 +6,11 @@ A QuickStore is not intended to substitute local database,
 Usage:
 store_path = '~/data/qstore'
 qs = QuickStore(store_path)
-qs['my_key'].add(value).dump()
-this will add the value to the stored 'my_key' collection  (set in this case) AND remove duplicates in the collection (set behaviour)
+qs['my_key'].add(data).dump()
+this will add the data to the stored 'my_key' collection  (set in this case) AND remove duplicates in the collection (set behaviour)
 
 In general QuickStore.__getitem__ will return a CollectionProxy.
-qs['my_key'] -> <CollectionProxy value=[1,2,3...]>
+qs['my_key'] -> <CollectionProxy data=[1,2,3...]>
 
 CollectionProxy has 5 methods:
     add(element): adds element to the stored collection and makes sure duplicates are removed (as in set)
@@ -29,24 +29,24 @@ qs['my_key].append(element)
 All the above methods of CollectionProxy retrun the parenting QuickStore instance, so further .dump() can be used.
 qs['my_key].append(element).dump()
 
-To get the stored collection use property value
-qs['my_key'].value -> [1,2,3,4,5]
+To get the stored collection use property data
+qs['my_key'].data -> [1,2,3,4,5]
 
 
 # importing
 from quickstore import QuickStore
 
 # instantiation
-# it can be any path but it is also reasonable to keep one QuickStore per project.
+# it can be any path, but it is also reasonable to keep one QuickStore per project.
 qs = QuickStore(filepath)
 
 # reading record
-qs['my vars'].value - to retireve the recorded colelction
+qs['my vars'].data - to retireve the recorded colelction
 
 # creating new record (as per dictionary protocl)
-qs['client_names'] = dict(clinet_names_collection)
+qs['client_names'] = dict(clinet_names_collection)  # overwriting
 OR
-qs['client_names'].update(dict(clinet_names_collection))
+qs['client_names'].update(dict(clinet_names_collection))  # this might preserve old values
 
 qs.dump()
 # this will dump the collection into json data.
@@ -91,7 +91,7 @@ class CollectionProxy:
         self.old = origin_dict.get(key, missing)
 
     @property
-    def value(self):
+    def data(self):
         return self.origin_dict[self.key]
 
     def update(self, m: Mapping={}, **kwargs):
@@ -152,13 +152,13 @@ class CollectionProxy:
         self.origin_dict[self.key] = val
 
     def __repr__(self):
-        if len(s := str(self.value).split(',')) > 10:
+        if len(s := str(self.data).split(',')) > 10:
             close = s[0].startswith('{') and '}' or ']'
             val = f"{','.join(s[:10])} {'...'} {close}"
         else:
-            val = self.value
+            val = self.data
 
-        return f'<CollectionProxy value: {val}>'
+        return f'<CollectionProxy data: {val}>'
 
 
 def get_absolute_path(p: Union[str, pathlib.Path]):

@@ -18,20 +18,27 @@ def absolute_path(path: Union[str, pathlib.Path]) -> str:
     return path
 
 
-def files_in_dir(directory_path: str, condition: Optional[callable] = None, r: bool = False) -> list:
+def files_in_dir(directory_path: str, condition: Optional[Union[callable, str]] = None, r: bool = False) -> list:
     """
     returns a list of file paths of all files present in the required directory.
     condition is supposed to be a callable returning bool when passed a filename
 
     directory_path: str - path of the relevant directory
-    condition: callable
+    condition: callable or str for re pattern matching
     r: bool - default is False, decides if inner directories are to be searched for relevant files recurently"""
 
     if not isinstance(directory_path, str):
         raise TypeError('directory_path argument must be type str.')
     condition = condition or bool
-    if not callable(condition):
-        raise TypeError('condition parameter must be a callable')
+
+    if callable(condition):
+        pass
+    elif isinstance(condition, str):
+        pattern = condition
+        condition = lambda x: pattern in x
+    else:
+        raise TypeError('condition parameter must be a callable or str for re pattern matching')
+
     r = bool(r)
 
     filenames = os.listdir(directory_path)
@@ -107,4 +114,8 @@ def read_json(path, encoding='utf-8'):
     with open(path, 'r', encoding=encoding) as f:
         return json.loads(f.read())
 
+load_json = read_json  # alias
 
+def save_json(path, j, encoding='utf-8'):
+    with open(path, 'w', encoding=encoding) as f:
+        return f.write(json.dumps(j))

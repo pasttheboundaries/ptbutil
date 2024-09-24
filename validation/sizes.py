@@ -1,6 +1,7 @@
 from ptbutil.errors import ValidationError
 from typing import Collection, Optional
 
+
 def validate_len(obj: Collection,
                  min_len: int,
                  max_len: int,

@@ -14,3 +14,10 @@ def copy_func(f, globals=None, module=None):
         g.__module__ = module
     g.__kwdefaults__ = copy.copy(f.__kwdefaults__)
     return g
+
+def pipeline(*callables):
+    def p(arg):
+        for call in callables:
+            arg = call(arg)
+        return arg
+    return p

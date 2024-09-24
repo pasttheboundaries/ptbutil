@@ -2,3 +2,4 @@ from .listwise import (chaintype, each_with_each, flatlist, GridFeed, ifish, ind
                        UnevenNestingError, Nesting, nesting, ngrams, nlen, sequence_binary_mask, Stack)
 from .dictwise import sort_by_value, merge_2_dicts, dicta
 from .rangewise import Range, Multirange
+from .other import zipeven

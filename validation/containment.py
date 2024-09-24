@@ -4,7 +4,7 @@ from ptbutil.errors import ValidationError, ContainmentError
 
 
 
-def validate_in(object, collection, parameter_name=None, error_messag: str = None):
+def validate_in(obj, collection, parameter_name=None, error_message: str = None):
 
     validate_type(collection, Collection, parameter_name='collection',
                   error_message=f'parameter collection must be Collection, not {type(collection).__name__}')
@@ -14,6 +14,8 @@ def validate_in(object, collection, parameter_name=None, error_messag: str = Non
     else:
         parameter_name = 'Passed object'
 
-    if object not in collection:
-        raise ValidationError from ContainmentError(f'{parameter_name} not collection of valid objects.')
+    error_message = error_message or f'{parameter_name}  does not belong to the required collection: {collection}.'
+
+    if obj not in collection:
+        raise ValidationError from ContainmentError(error_message)
 

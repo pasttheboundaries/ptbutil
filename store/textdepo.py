@@ -23,14 +23,15 @@ Dependencies:
 import pathlib
 import os
 import time
-from dataclasses import dataclass
-from typing import Union, Optional, Iterable, Callable, Generator, Any
+import json
+from dataclasses import dataclass, field
+from typing import Union, Optional, Iterable, Callable, Generator, Any, NoReturn
 from collections.abc import Iterable as IterableType
 from hashlib import sha1
 from ptbutil.files.functions import absolute_path, timestampped_filename
-from ptbutil.validation.types import validate_type
-from ptbutil.store.quickstore import QuickStore, CollectionProxy
-
+from ptbutil.validation import validate_type, validate_with_callable
+from ptbutil.store.quickstore import QuickStore
+from ptbutil.iteration import zipeven
 
 
 def textdepo_hash(text) -> str:
@@ -45,39 +46,58 @@ def textdepo_hash(text) -> str:
     """
     return sha1(text.encode()).hexdigest()
 
+
 def conditional_check(condition, s: str) -> bool:
     if isinstance(condition, str):
         return condition in s
     elif callable(condition):
         res = condition(s)
-        if not isinstance (res, bool):
+        if not isinstance(res, bool):
             raise ValueError(f'condition checking callable must return bool. Got {type(res)}')
         return res
     else:
         raise TypeError(f'condition must be str or Callable returning bool.')
 
+
+def serializable(obj: Any):
+    try:
+        json.dumps(obj)
+        return True
+    except TypeError:
+        return False
+
+
 class TextDepoIndex(QuickStore):
     """
-        A subclass of QuickStore for managing the file index of TextDepo.
+    A subclass of QuickStore for managing the file index of TextDepo.
 
-        This class provides methods for setting, getting, and checking the presence
-        of items in the file index.
+    This class provides methods for setting, getting, and checking the presence
+    of items in the file index.
     """
 
-    def set(self, k, v) ->CollectionProxy :
+    def set(self, k, v) -> QuickStore:
         return self['files_index'].update({k: v})
 
-    def get(self,k ) -> Any:
-        return self['files_index'].value.get(k)
+    def get(self, k) -> Any:
+        return self['files_index'].data.get(k)
+
+    def keys(self):
+        return self['files_index'].data.keys()
+
+    def values(self):
+        return self['files_index'].data.values()
+
+    def items(self):
+        return self['files_index'].data.items()
 
     def __contains__(self, item) -> bool:
         try:
-            return item in self['files_index'].value.keys()
+            return item in self['files_index'].data.keys()
         except KeyError:
             return False
 
     def __len__(self) -> int:
-        return len(self['files_index'].value)
+        return len(self['files_index'].data)
 
 
 @dataclass
@@ -86,6 +106,7 @@ class FileDescriptor:
     len: int
     time: str
     filename: str
+    filemeta: field(default_factory=dict)
 
     def as_dict(self):
         return self.__dict__
@@ -109,23 +130,27 @@ class TextDepo:
                                     f'because this directory does not exist.')
         self.file_name = file_name
         self.encoding = encoding
-        self.index = TextDepoIndex(os.path.join(self.dir_path, f'{self.file_name}.index'))
+        index_name = self.file_name or ''
+        self.index = TextDepoIndex(os.path.join(self.dir_path, f'{index_name}.index'))
 
-
-    def cook_descriptor(self, text) -> FileDescriptor:
+    def cook_descriptor(self, text, meta: Optional[dict] = None) -> FileDescriptor:
+        meta = meta or dict()
         return FileDescriptor(hash=textdepo_hash(text),
                               len=len(text),
                               time=time.strftime('%Y%m%dT%X', time.localtime()),
                               filename=timestampped_filename(prefix=self.file_name,
                                                              extension='txt',
                                                              timeformat='%Y%m%dT%H%M%S',
-                                                             precision=True))
+                                                             adnex_sep='p'),
+                              filemeta=meta)
 
+    def write(self, text: str, drop_duplicates=True, **meta) -> None:
+        validate_type(text, str, error_message=f'TextDepo can only write type str.')
+        validate_type(meta, dict, error_message=f'File meta information must be type dict')
+        for v in meta.values():
+            validate_with_callable(v, serializable)
 
-    def write(self, text: str, drop_duplicates=True) -> None:
-        validate_type(text, str, error_message='TextDepo can only write type str.')
-
-        descriptor = self.cook_descriptor(text)
+        descriptor = self.cook_descriptor(text, meta=meta)
 
         if drop_duplicates and descriptor.hash in self.index:
             return
@@ -136,14 +161,29 @@ class TextDepo:
                 f.write(text)
             self.index.set(descriptor.hash, descriptor.as_dict()).dump()
 
-    def write_many(self, texts: Iterable, drop_duplicates=True) -> None:
+    def write_many(self,
+                   texts: Iterable,
+                   drop_duplicates: bool = True,
+                   meta: Optional[Iterable[dict]] = None) -> None:
+
+        # validation
+        validate_type(meta, IterableType, error_message='Parameter meta must be an iterable of dict types.')
         validate_type(texts, IterableType, error_message='Method write_many accepts Iterable type only.')
-        for t in texts:
-            self.write(t, drop_duplicates=drop_duplicates)
+
+        for t, m in zipeven(texts, meta):
+            self.write(t, drop_duplicates=drop_duplicates, meta=m)
+
+        # this should be implemented if the loop above fails
+        # texts = tuple(texts)
+        # meta = tuple(meta)
+        # if len(meta) != len(texts):
+        #     raise ValueError(f'Different number of meta information and texts.')
+        # for t,m  in zip(texts, meta):
+        #     self.write(t, drop_duplicates=drop_duplicates, meta=m)
 
     def read(self,
              filename: Optional[str] = None,
-             condition: Optional[Union[Callable, str]] = None) -> str:
+             condition: Optional[Union[Callable, str]] = None) -> Union[str, NoReturn]:
         if not (filename or condition):
             raise ValueError('Expected one of arguments: filename or condition')
 
@@ -156,7 +196,7 @@ class TextDepo:
             elif os.path.isfile(f := os.path.join(self.dir_path, filename)):
                 file_path = f
             else:
-                raise FileNotFoundError (f'{filename}')
+                raise FileNotFoundError(f'{filename}')
             with open(file_path, 'r', encoding=self.encoding) as file:
                 return file.read()
         else:
@@ -174,4 +214,4 @@ class TextDepo:
             yield self.read(filename=filename)
 
     def __repr__(self):
-        return (f'<TextDepo dir:{self.dir_path}, len={len(self.index)}>')
+        return f'<TextDepo dir: {self.dir_path}, len={len(self.index)}>'
