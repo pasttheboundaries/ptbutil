@@ -32,7 +32,7 @@ class FileHandler:
         fh = FileHandler(path)
         fh.open()  # this deliveres actual data structure read from the data
         fh.append(crawl_result)  # this appends to the data structure
-        fh.dump() # this dumps the data structure to the data
+        fh.dump() # this dumps the data structure to the file
         fh.close() # this purges data structure from memeory
 
         all methods return self

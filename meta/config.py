@@ -161,7 +161,7 @@ class Config(object):
            if present - updates self from the data.
            2. searches environment for variables and adds them to config_temp.
            If same name variables have been predefined in yaml data (step 1), they will be overriden.
-           Updating is made in plase (as in bult-in dict.update). Also returns the config.
+           Updating is made in place (as in bult-in dict.update). Also returns the config.
 
            When performing method auto(), and instance name had been defined at its instantiation:
            conf = Config('MYAPP')

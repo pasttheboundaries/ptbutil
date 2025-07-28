@@ -31,23 +31,20 @@ for _ in range(3):
 ### output is a dict of stats
 >>>a.stats.registry
 
-OUTPUT:  {'CountCalls:b': 3, 'CountReturns:b': 3}
+OUTPUT:  StatsInstanceRegistry: {'CountCalls:b': 3, 'CountReturns:b': 3}
 
 ### Access to globals stats
-### output is a StatsRegistryPrimaryDict
+### output is a StatsClassRegistry
 >>> Stats.registry
 
-OUTPUT:  StatsRegistryPrimaryDict(<function classstats.models.stats_instance_registry()>,
-                  {'A': defaultdict(dict,
-                               {4397438912: {'CountCalls:b': 3,
-                                 'CountReturns:b': 3}})})
+OUTPUT:  StatsClassRegistry: {'A': {4409448080: {'CountCalls:b': 3, 'CountReturns:b': 3}}}
 
-### StatsRegistryPrimaryDict can be reduced if there is only one instance of a class monitored:
+### StatsClassRegistry can be reduced if there is only one instance of a class monitored:
 ### the output is also cast built-in dict type
 >>> Stats.registry.reduce()  # reduces instance subdict if there is only one instance monitored
 OUTPUT: {'A': {'CountCalls:b': 3, 'CountReturns:b': 3}}
 
-### StatsRegistryPrimaryDict can be cast to buit-in dict types without reduction
+### StatsClassRegistry can be cast to buit-in dict types without reduction
 >>> Stats.registry.cast()  # casts to buili-it types
 OUTPUT: {'A': {4397438912: {'CountCalls:b': 3, 'CountReturns:b': 3}}}
 """
@@ -95,12 +92,13 @@ class StatsRegistryObject(Castable):
 
 
 class StatsRegistryDict(defaultdict, StatsRegistryObject):
-    pass
+    def __repr__(self):
+        return f'{self.__class__.__name__}: {self.cast()}'
 
 
-class StatsRegistryPrimaryDict(StatsRegistryDict):
+class StatsClassRegistry(StatsRegistryDict):  # former StatsRegistryPrimaryDict
     def reduce(self):
-        reduced = StatsRegistryPrimaryDict()
+        reduced = self.__class__()
         for k, v in self.items():
             if len(v) == 1:
                 reduced[k] = v[tuple(v.keys())[0]]
@@ -113,17 +111,17 @@ class StatsRegistrySecondaryDict(StatsRegistryDict):
     pass
 
 
-class StatsRegistryTertiaryDict(StatsRegistryDict):
+class StatsInstanceRegistry(StatsRegistryDict):  # former StatsInstanceRegistry
     pass
 
 
 def secondary_dict_factory():
     """factory for default secondary dict of StatsRegistry"""
-    return StatsRegistrySecondaryDict(StatsRegistryTertiaryDict)
+    return StatsRegistrySecondaryDict(StatsInstanceRegistry)
 
 
 def get_stats_registry_primary_dict():
-    return StatsRegistryPrimaryDict(secondary_dict_factory)
+    return StatsClassRegistry(secondary_dict_factory)
 
 
 class StatsRegistry:
@@ -179,6 +177,8 @@ class Stats:
         else:
             raise ValueError(f'{stat} is not a valid stat. For valid stats check classstats.VALID_STATS')
 
+    def __repr__(self):
+        return f"<Stats instance: {repr(self.owner_instance)}>"
 
 class Stat(ABC):
     """

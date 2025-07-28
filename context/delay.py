@@ -10,6 +10,14 @@ class Delay:
 
     t: float - time in seconds or a callable returning float
     sd: float - standard deviation of variability distribution as gaussian
+
+    Usage:
+    # do something
+    with Delay(5, 2):
+        pass
+    # do sumethinf after delay
+
+
     """
     def __init__(self, t: Union[float, Callable], sd: Optional[float] = None):
         self.t = t

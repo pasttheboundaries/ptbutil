@@ -90,17 +90,18 @@ class ReducedOverseerRegistry(dict):
 
 
 class OverseerRegistryDict(defaultdict, OverseerRegistryObject):
-    pass
+    def __repr__(self):
+        return f'{self.__class__.__name__}: {self.cast()}'
 
 
-class OverseerRegistryPrimaryDict(OverseerRegistryDict):
+class OverseerClassRegistry(OverseerRegistryDict):  # former OverseerClassRegistry
     """
-    OverseerRegistryPrimaryDict is the main dict of OverseerRegistry:
+    OverseerClassRegistry is the main dict of OverseerRegistry:
     the keys are overseen instance.__class__.__name__
         the values are dicts where keys are id(instance) (type int)
     it implements 3 methods:
     fill: uses the stored indices to build the copy of self filled with values acquired from Overseer.history
-        The return object is also OverseerRegistryPrimaryDict so further reduce or cast methods can be exercised
+        The return object is also OverseerClassRegistry so further reduce or cast methods can be exercised
         However the returned object is a copy of the orifinal one.
     reduce: returns a ReducedOverseerRegistry:
         the secondary dict values are moved and ascribed to the primary dict (__class__.__name__)
@@ -116,12 +117,12 @@ class OverseerRegistryPrimaryDict(OverseerRegistryDict):
 
 class OverseerRegistrySecondaryDict(OverseerRegistryDict):
     """
-    OverseerRegistryPrimaryDict is the main dict of OverseerRegistry:
+    OverseerClassRegistry is the main dict of OverseerRegistry:
     the keys are overseen instance.__class__.__name__
         the values are dicts where keys are id(instance) (type int)
     it implements 3 methods:
     fill: uses the stored indices to build the copy of self filled with values acquired from Overseer.history
-        The return object is also OverseerRegistryPrimaryDict so further reduce or cast methods can be exercised
+        The return object is also OverseerClassRegistry so further reduce or cast methods can be exercised
         However the returned object is a copy of the orifinal one.
     reduce: returns a ReducedOverseerRegistry: in case only one instance of a class is overseen,
         the secondary dict values are moved and ascribed to the primary dict (__class__.__name__)
@@ -140,7 +141,7 @@ def secondary_dict_factory():
 
 
 def get_overseer_registry_primary_dict():
-    return OverseerRegistryPrimaryDict(secondary_dict_factory)
+    return OverseerClassRegistry(secondary_dict_factory)
 
 
 class OverseerRegistry:
@@ -160,14 +161,72 @@ class OverseerRegistry:
         else:
             return ovs_class._registry[ovs_instance.owner_instance.__class__.__name__][id(ovs_instance.owner_instance)]
 
+class OverseerHistoryDescriptor:
+
+    def __get__(self, ovs_instance, ovs_class) -> Union[list, dict]:
+        if not hasattr(ovs_class, '_history'):
+            ovs_class._history = OverseerHistory()
+        if not ovs_instance:
+            return ovs_class._history
+        else:
+            return [ovs_class._history[i] for i in ovs_instance.registry]
+
 
 class Overseer:
     """
     Overseer is ment to me instantiated as an attribute of an instance
     method oversee is meant to decorate object methods at runtime
+
+    use:
+
+class A:
+    def __init__(self):
+        self.a = 1
+
+        ### instantiation of Overseer
+        self.overseer = Overseer(self)
+
+        ### declaration of overseeing
+        self.overseer.oversee(self.b, store_args=True, before_call=True)
+        self.overseer.oversee(self.b, owner_attributes='a', after_return=True)
+
+    def b(self, k=1):
+        self.a += k
+        return k
+
+### class A instantiation
+a = A()
+
+### lets perform some method calls
+for k in range(3):
+    print(a.b(k))
+
+OUTPUT:
+0
+1
+2
+
+### Access to instance.overseer.history:
+### output is a list of stats
+>>>a.overseer.history
+
+OUTPUT:
+[OverseerHistoryItem(owner_class='A', owner_instance_id=4423806464, method='b', when='called', time=datetime.datetime(2024, 9, 26, 0, 12, 53, 778232), owner_attributes=None, args=(0,), kwargs={}, text=None, result=None),
+ OverseerHistoryItem(owner_class='A', owner_instance_id=4423806464, method='b', when='returned', time=datetime.datetime(2024, 9, 26, 0, 12, 53, 778252), owner_attributes={'a': 1}, args=None, kwargs=None, text=None, result=None),
+ OverseerHistoryItem(owner_class='A', owner_instance_id=4423806464, method='b', when='called', time=datetime.datetime(2024, 9, 26, 0, 12, 53, 778286), owner_attributes=None, args=(1,), kwargs={}, text=None, result=None),
+ OverseerHistoryItem(owner_class='A', owner_instance_id=4423806464, method='b', when='returned', time=datetime.datetime(2024, 9, 26, 0, 12, 53, 778291), owner_attributes={'a': 2}, args=None, kwargs=None, text=None, result=None),
+ OverseerHistoryItem(owner_class='A', owner_instance_id=4423806464, method='b', when='called', time=datetime.datetime(2024, 9, 26, 0, 12, 53, 778304), owner_attributes=None, args=(2,), kwargs={}, text=None, result=None),
+ OverseerHistoryItem(owner_class='A', owner_instance_id=4423806464, method='b', when='returned', time=datetime.datetime(2024, 9, 26, 0, 12, 53, 778308), owner_attributes={'a': 4}, args=None, kwargs=None, text=None, result=None)]
+
+### Access to globals stats
+### output is a StatsClassRegistry
+>>> Overseer.history
+
+OUTPUT:  Sthis returns all history items from all registered methods and instances
     """
+
     registry = OverseerRegistry()
-    history = OverseerHistory()
+    history = OverseerHistoryDescriptor()
 
     def __init__(self, owner_instance) -> None:
         self.owner_instance = owner_instance
@@ -184,6 +243,9 @@ class Overseer:
         if store_times:
             dump.time = datetime.now()
         if owner_attributes:
+            if isinstance(owner_attributes, str):
+                owner_attributes = (owner_attributes,)
+
             if isinstance(owner_attributes, (tuple, list)):
                 owner_attrs = {k: v for k, v in owner_instance.__dict__.items() if k in owner_attributes}
             else:
@@ -288,8 +350,8 @@ class Overseer:
                     when = 'called'
                     dump = self._compose_dump(store_args, store_times, owner_instance, method_name, when, owner_attributes, text,
                                               args, kwargs, None)
-                    self.registry.append(OverseerHistoryIndex(len(self.history)))
-                    self.history.append(dump)
+                    self.registry.append(OverseerHistoryIndex(len(self.__class__.history)))
+                    self.__class__.history.append(dump)
                 self._manage_oversee_hook_calls(before_call)
 
             result = method(*args, **kwargs)
@@ -304,8 +366,8 @@ class Overseer:
                     dump = self._compose_dump(store_args, store_times, owner_instance, method_name, when, owner_attributes, text,
                                               args, kwargs, dump_result)
 
-                    self.registry.append(OverseerHistoryIndex(len(self.history)))
-                    self.history.append(dump)
+                    self.registry.append(OverseerHistoryIndex(len(self.__class__.history)))
+                    self.__class__.history.append(dump)
                 self._manage_oversee_hook_calls(after_return)
 
             return result

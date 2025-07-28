@@ -14,7 +14,7 @@ class FileNamesRotator:
     """
     Governs the domain filenames
     current: returns current filename
-    next: retruns next afeter last filename
+    next: retruns next after last filename
     apply_index: renames unindexed data to 0
     """
     def __init__(self,

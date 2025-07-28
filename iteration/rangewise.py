@@ -26,6 +26,8 @@ class Range:
     Supported operations:
         =, <, >, len, iter, indexing, slicing
         Indexing returns iteger, slicing returns range
+
+    Range does not implement step
     """
     def __init__(self, start=None, stop=None):
         if stop is None:
@@ -435,3 +437,53 @@ class Multirange:
             return self + other
         else:
             raise TypeError(f'{type(other)}')
+
+
+class Index:
+    def __init__(self, elements: Iterable):
+        l = sorted([e for e in elements])
+        for i in range(len(l) - 1):
+            if l[i+1] - l[i] != 1:
+                raise ValueError(f'index must be an iterable if int with increment = 1')
+        self.list = l
+        self.start = self.list[0]
+        self.stop = self.list[-1]
+
+    def __iter__(self):
+        yield from self.list
+
+
+    def __repr__(self):
+        return f'Index {list(self)}'
+
+    def range(self):
+        return Range(self.start, self.stop + 1)
+
+
+class Multiindex:
+    def __init__(self, elements: Iterable):
+        self.indexes = []
+        if not all(isinstance(e, int) for e in elements):
+            raise TypeError(f'All elements of Multiindex must be type int')
+        elements = sorted(elements)
+        index_list = []
+        for e in elements:
+            if index_list:
+                if e - index_list[-1] == 1:
+                    index_list.append(e)
+                    continue
+                else:
+                    self.indexes.append(Index(index_list))
+                    index_list = [e]
+            else:
+                index_list.append(e)
+        self.indexes.append(Index(index_list))
+
+    def range(self):
+        return Multirange(*[i.range() for i in self.indexes])
+
+    def __iter__(self):
+        for ind in self.indexes:
+            for e in ind:
+                yield e
+

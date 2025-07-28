@@ -5,6 +5,7 @@ from ptbutil.errors import DecorationError
 from functools import partial
 from ptbutil.func.decay import Decay
 from ptbutil.portable.metalawareparam import MetalAwareParam
+from inspect import signature, _empty
 
 handler = logging.StreamHandler()
 formatter = logging.Formatter('%(message)s')
@@ -19,40 +20,62 @@ class PersistanceError(Exception):
     pass
 
 
-def _persist_decorator(fn, _n):
+def _persist_decorator(fn, _n, log):
+
+    function_defaults = signature(fn).parameters
+    function_defaults = {k: v.default for k, v in function_defaults.items()}
+
     @wraps(fn)
     def wrapper(*args, **kwargs):
-
+        err = RuntimeError
         for n_persist in range(_n):
             try:
-                logger.debug(f'Function {fn.__name__} persistance loop {n_persist} opened')
+                if log:
+                    logger.debug(f'Function {fn.__name__} persistance loop {n_persist} opened')
                 result = fn(*args, **kwargs)
+                # return if function returns correctly
+                if log:
+                    logger.debug(f'Function {fn.__name__} persistance loop {n_persist} closed')
                 return result
+
             except Exception as e:
                 err = e
-            finally:
-                logger.debug(f'Function {fn.__name__} persistance loop {n_persist} closed')
-        raise PersistanceError(f'Function {fn.__name__} unable to persist with args: {args}, kwargs: {kwargs}')\
+
+        # unable to persist
+        raise PersistanceError(f'Function {fn.__name__} called {_n} times, '
+                               f'but unable to persist with:\n'
+                               f'args: {args},\n'
+                               f'kwargs: {kwargs},\n'
+                               f'defaults: {function_defaults}')\
             from err
     return wrapper
 
 
-def persist(arg):
+def persist(arg=2, log=False):
     """
     This is a decorator.
     It can be used without arguments, in this case n will be 1
-    or with a single argument which must be type int, to indicate value n.
+    or with a single positional argument which must be type int, to indicate value n.
+
 
     Decorated function will be performed n times if it throws an error during runtime
     before finally it throws a PersistanceError.
     Last error will be propagated in traceback.
+
+    kwarg log swithces logging
+
+
     """
     if callable(arg):
         _n = 1
-        return _persist_decorator(arg, _n)
+        return _persist_decorator(arg, _n, log=log)
+    elif isinstance(arg, bool):  # only log was declared
+        _n = 1
+        log = arg
+        return partial(_persist_decorator, _n=arg, log=log)
     elif isinstance(arg, int):
         _n = arg
-        return partial(_persist_decorator, _n=arg)
+        return partial(_persist_decorator, _n=arg, log=log)
     else:
         raise DecorationError from TypeError('persist can accept type int as parameter only')
 
@@ -68,7 +91,7 @@ def machineaware_delay_persist(n=3, delay_max=10, delay_min=0):
     Fn will be reperformed n times if it throws an exception of any kind before the exception is risen.
 
     There will delay implemented before the function is performed.
-    The delay starts with delay_max value but asymptotically will be decreasing towards 0 each time exception is not thrown.
+    The delay starts with delay_max value but asymptotically will be decreasing towards delay_min each time exception is not thrown.
     If exception is thrown it will be asssumed that it was caused by timeout and predelay will be increased according to Delay protoclo.
 
     The implemented delay is machine aware. This means that if it works form a portable medium (usb-drive)

@@ -178,7 +178,7 @@ class DispersedDataStore:
 
     def append(self, data, domain=DEFAULT_DOMAIN, dump=False):
         """
-        appends and writes into existing_files DispersedIndexedStore
+        appends and oprionally dumps into existing_files DispersedIndexedStore
         """
         domain_store = self._get_domain_store(domain)
         domain_store.append(data, dump=dump)

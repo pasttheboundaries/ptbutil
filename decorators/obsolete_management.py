@@ -37,7 +37,7 @@ def _obsolete_decorator(fn, message_appendix=None):
 
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        nonlocal calls
+        nonlocal called
         if called:
             logger.warning(message)
             called = True

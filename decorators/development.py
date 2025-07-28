@@ -1,4 +1,4 @@
-from .indentating_logger import MetaLogger
+from ..meta import red_info
 from functools import wraps, partial
 
 
@@ -14,8 +14,8 @@ def in_development(arg):
     :param arg:
     :return:
     """
-    if isinstance(arg, type):  # TODO class managenment
-        return arg
+    if isinstance(arg, type):
+        return _developed_class_decorator(arg)
     elif callable(arg):
         return _developed_decorator(arg)
     elif isinstance(arg, str):
@@ -27,16 +27,32 @@ def in_development(arg):
 def _developed_decorator(fn, message_appendix=None):
 
     calls = 0
-    logger = MetaLogger.logger
     message = f'Function {fn.__name__} is in development. '
     if message_appendix:
         message = message + message_appendix
     @wraps(fn)
     def wrapper(*args, **kwargs):
         nonlocal calls
-        if calls == 0:
-            logger.warning(message)
+        if not calls:
+            red_info(message)
             calls = 1
         return fn(*args, **kwargs)
 
     return wrapper
+
+
+def _developed_class_decorator(cls):
+    message = f'Class {cls.__name__} is in development. '
+    original_init = cls.__init__
+    calls = 0
+
+    @wraps(original_init)
+    def new_init(self, *args, **kwargs):
+        nonlocal calls
+        if not calls:
+            red_info(message)
+            calls = 1
+        original_init(self, *args, **kwargs)
+
+    cls.__init__ = new_init
+    return cls

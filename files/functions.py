@@ -9,6 +9,7 @@ import time
 import yaml
 
 
+
 def absolute_path(path: Union[str, pathlib.Path]) -> str:
     if isinstance(path, str) and '~' in path:
         path = path.replace('~', str(pathlib.Path.home()))
@@ -16,6 +17,17 @@ def absolute_path(path: Union[str, pathlib.Path]) -> str:
         pass
     path = str(pathlib.Path(path).absolute())
     return path
+
+
+def create_dirs(path: Union[str, pathlib.Path]) -> None:
+    for d in pathlib.Path(absolute_path(path)).parents[::-1]:
+        if os.path.isdir(d):
+            pass
+        else:
+            os.mkdir(d)
+
+
+
 
 
 def files_in_dir(directory_path: str, condition: Optional[Union[callable, str]] = None, r: bool = False) -> list:

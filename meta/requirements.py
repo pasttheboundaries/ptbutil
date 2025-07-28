@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional, Iterable, Dict, List
 from collections.abc import Iterable as IterableType
 
+
 class Requirements:
     def __init__(self, directory):
         self.directory = Path(directory)
@@ -181,7 +182,8 @@ class Requirements:
 
 def requirements(*package_paths: str,
                  custom: bool = True,
-                 exclude: Optional[Iterable[str]] = None) -> Dict[str, List[str]]:
+                 exclude: Optional[Iterable[str]] = None,
+                 save: bool = False) -> Dict[str, List[str]]:
     """
     Analyze multiple package directories and return their requirements.
 
@@ -223,6 +225,8 @@ def requirements(*package_paths: str,
 
         # Store the requirements
         results[package_name] = sorted(compiler.requirements)
+        if save:
+            compiler.save()
 
     return results
 

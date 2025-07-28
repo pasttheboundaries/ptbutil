@@ -112,7 +112,6 @@ class perf_pool:
 \r\trelative = {round(res['relative'], perf_pool.decimal)}""")
 
 
-
 def performance(repetitions=1, mean=False):
     """Callable decorator.
     Output functions prints timing to stout. Can perform decorated fucnction multiple times and count mean timeing.
@@ -139,6 +138,7 @@ def performance(repetitions=1, mean=False):
         return wrapper
     return decorator
 
+
 def print_timing(fn):
     """simple decorator printing timing to stout"""
     @wraps(fn)
@@ -149,6 +149,7 @@ def print_timing(fn):
         print(f'Function {fn.__name__} timing: {str(t2-t1)}')
         return result
     return wrapper
+
 
 class StopperRecord:
     def __init__(self, current, total, lap, comment, decimal=3, oneline=False):
@@ -257,3 +258,22 @@ class Stopper:
     def __str__(self):
         return self.status()
 
+
+class Timer:
+    def __init__(self):
+        self.t0 = 0
+        self.t1 = 0
+
+    def __enter__(self):
+        self.t0 = time.perf_counter()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.t1 = time.perf_counter()
+
+    @property
+    def time(self):
+        return self.t1 - self.t0
+
+    def __repr__(self):
+        return f'Timer: {self.t1 - self.t0}'
