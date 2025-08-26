@@ -39,9 +39,12 @@ class PtbSerializable(ABC):
         For example:
         PtbSerializable.register_foreign(datetime, serializable_init_params=lambda x: {'*': x.timetuple()[:6]})
         registers datetime.datetime type and defines the serializable_init_params function
+
     """
 
+    # this holds decorated user classes
     SERIALIZABLE_REGISTRY = dict()
+    # this holds foreign types
     FOREIGN_SERIALIZABLE_REGISTRY = dict()
 
     @classmethod
@@ -52,6 +55,23 @@ class PtbSerializable(ABC):
         as per PtbSerializable.__doc__
 
         """
+
+        try:
+            requirment = callable(subclass.__dict__['serialization_init_params'])
+            if not requirment:
+                raise NotImplementedError(f'PtbSerializable registered class must have serialization_init_params '
+                                          f'method implementd. Read PtbSerializable.serialization_init_params.__doc__')
+        except Exception as e:
+            raise e
+
+        try:
+            requirment = callable(subclass.__dict__['serialization_instance_attrs'])
+            if not requirment:
+                raise NotImplementedError(f'PtbSerializable registered class must have serialization_instance_attrs '
+                                          f'method implementd. Read PtbSerializable.serialization_instance_attrs.__doc__')
+        except Exception as e:
+            raise e
+        
         bases = tuple([b for b in subclass.__bases__ if b is not object] + [cls])
         new_type = type(subclass.__name__, bases, dict(subclass.__dict__))
         PtbSerializable.SERIALIZABLE_REGISTRY[subclass.__name__] = new_type
@@ -77,7 +97,8 @@ class PtbSerializable(ABC):
             it is expected to deliver a dict of attributes that will be ascribed to the instance after instantiation.
             If this is left None (default), no attributes will be ascribed after instantiation.
 
-        the registered methods (functions) will be used for ptbserialization
+        the above  registered methods (functions) will be used for ptbserialization
+
         """
         if not isinstance(type_, type):
             raise TypeError(f'argument type_ must be type.')
@@ -133,10 +154,6 @@ class PtbSerializable(ABC):
         If bool value of return is False - adding attributes after instantiation will be skipped.
         """
         ...
-
-
-# registering datetime
-PtbSerializable.register_foreign(datetime, serializable_init_params=lambda x: {'*': x.timetuple()[:6]})
 
 
 def ptbs_preprocess(obj):
@@ -199,7 +216,9 @@ class PtbSerialisationDecoder(json.JSONDecoder):
         super().__init__(*args, **kwargs)
 
     def decode(self, obj: str):
+        # print(type(obj), end='->')
         obj = super().decode(obj)
+        # print(type(obj))
         obj = self.decode_dispatch(obj)
         return obj
 
@@ -286,3 +305,7 @@ def deserialize(obj):
     It deserializes all classes registered by PtbSerializable
     """
     return json.loads(obj, cls=PtbSerialisationDecoder)
+
+
+# registering common foreign types
+PtbSerializable.register_foreign(datetime, serializable_init_params=lambda x: {'*': x.timetuple()[:6]})
